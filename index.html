@@ -7,70 +7,17 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Firebase (Compat) -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap');
-    body {
-      font-family: 'Inter','Noto+Sans+JP',system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
-      -webkit-tap-highlight-color: transparent;
-    }
+    body { font-family: 'Inter','Noto Sans JP',system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; -webkit-tap-highlight-color: transparent; }
 
     ::-webkit-scrollbar{ width:8px; height:8px; }
     ::-webkit-scrollbar-track{ background:#eef2ff; }
     ::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:10px; }
     ::-webkit-scrollbar-thumb:hover{ background:#94a3b8; }
 
-    /* =========================
-       ②寄り（見た目だけ戻す）
-       - tap / tab-active / chip / bus badge / toast / modal
-       ※機能(JS)は一切変更なし
-    ========================= */
-
-    .tap{ transition:transform .08s ease, box-shadow .08s ease; }
-    .tap:active{ transform:scale(.98); }
-
-    .tab-active{
-      background:#eff6ff;
-      border-bottom:3px solid #2563eb;
-      color:#1e3a8a;
-      font-weight:900;
-    }
-
-    /* Status chips（②の配色） */
-    .chip{
-      display:inline-flex;
-      align-items:center;
-      gap:.35rem;
-      padding:.18rem .5rem;
-      border-radius:.65rem;
-      font-weight:900;
-      font-size:11px;
-      border:1px solid transparent;
-      white-space:nowrap;
-      line-height:1;
-    }
-    .chip-none{ background:#f8fafc; color:#64748b; border-color:#e2e8f0; }
-    .chip-ride{ background:#dbeafe; color:#1e40af; border-color:#bfdbfe; }
-    .chip-absent{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
-    .chip-pickup{ background:#dcfce7; color:#14532d; border-color:#bbf7d0; }
-    .chip-other{ background:#fef3c7; color:#78350f; border-color:#fde68a; }
-
-    /* Bus badges（②の配色：上瀑/総元/田代） */
-    .bus-u{ background-color:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; } /* 上瀑 */
-    .bus-s{ background-color:#fef3c7; color:#92400e; border:1px solid #fde68a; } /* 総元 */
-    .bus-t{ background-color:#dcfce7; color:#166534; border:1px solid #bbf7d0; } /* 田代 */
-
-    .toast-in{ animation:toastIn .18s ease-out; }
-    @keyframes toastIn{
-      from{ transform:translateY(8px); opacity:0; }
-      to{ transform:translateY(0); opacity:1; }
-    }
-
-    .modal-backdrop{ background:rgba(15,23,42,.55); }
+    /* ★A4縦向きに固定（@media の外に出す方が安定） */
+    @page{ size:A4 portrait; margin:7mm; }
 
     @media print{
       .no-print{ display:none !important; }
@@ -89,15 +36,13 @@
         display:block !important;
       }
 
-      html, body{
-        height:auto !important;
+      body{
         background:white !important;
         margin:0 !important;
         padding:0 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
-
       .print-shell{
         max-width:100% !important;
         width:100% !important;
@@ -105,46 +50,40 @@
         margin:0 !important;
       }
 
-      /* ★A4縦向きに固定 */
-      @page{ size:A4 portrait; margin:7mm; }
-
       /* プレビュー枠の余白/装飾を落として印刷を綺麗に */
       #print-content{
         padding:0 !important;
-        margin:0 !important;
         border:none !important;
         box-shadow:none !important;
         background:transparent !important;
-        overflow:visible !important;
       }
 
       /* =========================
-         ★白紙ページ対策（Edge向け強化）
-         - 末尾の改ページを明示的に避ける
-         - 最終ページは break-after: avoid を強制
+         ★白紙ページ対策（ここが肝）
+         - 末尾の改ページ(after)をやめる
+         - 2枚目以降の「前」で改ページ
       ========================= */
       #print-content .print-page{
         display:block;
         width:100%;
         margin:0 !important;
 
+        /* 末尾改ページを禁止（白紙ページ根絶） */
         page-break-after:auto !important;
         break-after:auto !important;
 
+        /* 途中分割も抑止 */
         page-break-inside:avoid !important;
         break-inside:avoid !important;
+      }
 
-        border-radius:0 !important; /* 印刷は角丸不要（僅差のはみ出し対策） */
-      }
-      #print-content .print-page:last-child{
-        page-break-after:avoid !important;
-        break-after:avoid !important;
-      }
+      /* 2ページ目以降の前で改ページ */
       #print-content .print-page + .print-page{
         page-break-before:always !important;
         break-before:page !important;
       }
 
+      /* 以降は既存スタイル（そのまま） */
       .print-card{ border:2px solid #000 !important; box-shadow:none !important; }
 
       .print-title{
@@ -162,65 +101,58 @@
       .td-stop{ white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
       .td-class{ font-weight:900 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important; text-align:center !important; }
 
-      /* ★バス別のバス停は1行省略（はみ出し/改ページ防止） */
-      .td-stop-bus{
-        font-weight:800 !important;
-        white-space:nowrap !important;
-        overflow:hidden !important;
-        text-overflow:ellipsis !important;
-      }
-
       .print-bus-card{
         border:2px solid #000 !important;
-        padding:1.6mm !important;
+        padding:2.0mm !important;
         page-break-inside:avoid;
         break-inside:avoid;
       }
       .print-bus-title{
-        font-size:9.6pt !important;
+        font-size:10.5pt !important;
         font-weight:900 !important;
-        margin:0 0 1.2mm 0 !important;
+        margin:0 0 1.6mm 0 !important;
         line-height:1.1 !important;
       }
 
       .print-bus-card .td-name,
-      .print-bus-card .td-class,
-      .print-bus-card .td-stop-bus{
+      .print-bus-card .td-class{
         white-space:nowrap !important;
         overflow:hidden !important;
         text-overflow:ellipsis !important;
       }
 
-      /* ★列が増えるので少しだけ詰める */
       .print-bus-card table th{
         background:#f3f4f6 !important;
-        font-size:6.0pt !important;
-        padding:0.8mm 0.8mm !important;
+        font-size:7.0pt !important;
+        padding:1.0mm 1.0mm !important;
         line-height:1.02 !important;
       }
       .print-bus-card table td{
-        font-size:6.2pt !important;
-        padding:0.8mm 0.8mm !important;
+        font-size:7.4pt !important;
+        padding:1.0mm 1.0mm !important;
         line-height:1.02 !important;
       }
-      .print-bus-card table tbody tr{ height:3.35mm; }
+      .print-bus-card table tbody tr{ height:4.05mm; }
 
-      .print-page.bus-sheet{ padding:1.6mm !important; }
-
+      .print-page.bus-sheet{ padding:2.0mm !important; }
       .bus-sheet .print-title{
-        padding-bottom:1.4mm !important;
-        margin-bottom:1.4mm !important;
+        padding-bottom:1.6mm !important;
+        margin-bottom:1.6mm !important;
         border-bottom:3px solid #000 !important;
       }
       .bus-sheet .print-title .print-title-en{ font-size:11pt !important; }
       .bus-sheet .print-title .print-title-ja{ font-size:9.2pt !important; }
 
-      /* ★Edge印刷の白紙対策：gridをやめてflex縦並びに（印刷のみ） */
       .print-bus-sheet{
-        display:flex !important;
-        flex-direction:column !important;
-        gap:1.6mm !important;
+        display:grid !important;
+        grid-template-rows:repeat(3, auto) !important;
+        gap:2.2mm !important;
       }
+      .print-bus-sheet .print-bus-card{ padding:1.6mm !important; }
+      .print-bus-sheet .print-bus-title{ font-size:9.2pt !important; margin:0 0 1.2mm 0 !important; }
+      .print-bus-sheet .print-bus-card table th{ font-size:6.0pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
+      .print-bus-sheet .print-bus-card table td{ font-size:6.4pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
+      .print-bus-sheet .print-bus-card table tbody tr{ height:3.45mm; }
 
       .print-class-card{
         border:2px solid #000 !important;
@@ -238,14 +170,46 @@
       .compact td{ font-size:9pt !important; padding:5px 6px !important; }
       .compact th{ font-size:8.5pt !important; padding:5px 6px !important; }
     }
+
+    .tap{ transition:transform .08s ease, box-shadow .08s ease; }
+    .tap:active{ transform:scale(.98); }
+
+    .tab-active{
+      background:#eff6ff;
+      border-bottom:3px solid #2563eb;
+      color:#1e3a8a;
+      font-weight:900;
+    }
+
+    .chip{ display:inline-flex; align-items:center; gap:.35rem; padding:.18rem .5rem; border-radius:.65rem; font-weight:900; font-size:11px; border:1px solid transparent; white-space:nowrap; line-height:1; }
+    .chip-none{ background:#f8fafc; color:#64748b; border-color:#e2e8f0; }
+    .chip-ride{ background:#dbeafe; color:#1e40af; border-color:#bfdbfe; }
+    .chip-absent{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
+    .chip-pickup{ background:#dcfce7; color:#14532d; border-color:#bbf7d0; }
+    .chip-other{ background:#fef3c7; color:#78350f; border-color:#fde68a; }
+
+    .bus-u{ background-color:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; }
+    .bus-s{ background-color:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+    .bus-t{ background-color:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+
+    .toast-in{ animation:toastIn .18s ease-out; }
+    @keyframes toastIn{ from{ transform:translateY(8px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+
+    .modal-backdrop{ background:rgba(15,23,42,.55); }
+
+    /* ヘッダーのピルが縮んで縦書きになるのを防止（JSでclassが上書きされても効く） */
+    #cloud-pill, #auth-pill { white-space: nowrap; flex-shrink: 0; }
   </style>
+
+  <!-- Firebase（このJSは window.firebase を使うので必須） -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 </head>
 
-<!-- ★②の見た目（背景/文字色）に戻す -->
 <body class="bg-slate-50 text-slate-800 min-h-screen">
-
   <!-- Login Overlay（SchoolCal方式：設定画面なし。ログイン後、自動でクラウド共有） -->
-  <div id="login-overlay" class="no-print fixed inset-0 z-[60] hidden">
+  <div id="login-overlay" class="fixed inset-0 z-[60] hidden">
     <div class="absolute inset-0 bg-slate-950/60"></div>
     <div class="relative max-w-md mx-auto mt-16 px-4">
       <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden">
@@ -282,7 +246,7 @@
   </div>
 
   <!-- Cloud Error Overlay（クラウド必須：失敗時にローカルへ黙って落ちない） -->
-  <div id="cloud-error-overlay" class="no-print fixed inset-0 z-[55] hidden">
+  <div id="cloud-error-overlay" class="fixed inset-0 z-[55] hidden">
     <div class="absolute inset-0 bg-slate-950/60"></div>
     <div class="relative max-w-2xl mx-auto mt-14 px-4">
       <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden">
@@ -310,56 +274,58 @@
   </div>
 
   <header class="no-print sticky top-0 z-40 bg-white/75 backdrop-blur-md border-b border-slate-200">
-    <!-- ★修正：折り返しをやめて1行固定 + 日付ブロックを左側へ -->
     <div class="max-w-[1400px] mx-auto px-4 py-3
-            flex items-center gap-3 flex-nowrap overflow-x-auto
-            lg:grid lg:grid-cols-[minmax(260px,1fr)_auto_minmax(420px,1fr)]
-            lg:items-center lg:gap-4 lg:overflow-visible">
+                flex items-center gap-3 flex-nowrap overflow-x-auto
+                lg:grid lg:grid-cols-[minmax(240px,360px)_auto_1fr]
+                lg:gap-4 lg:overflow-visible">
 
-  <!-- LEFT：タイトル（伸びすぎ防止 / 省略） -->
-  <div class="flex items-center gap-2 min-w-0 lg:overflow-hidden">
-    <div class="w-10 h-10 rounded-2xl bg-blue-600 shadow-lg shadow-blue-100 grid place-items-center shrink-0">
-      <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-          d="M4 17V7a2 2 0 0 1 2-2h9.5a2 2 0 0 1 1.4.6L20 8.7a2 2 0 0 1 .6 1.4V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
-        <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M4 10h16"/>
-      </svg>
-    </div>
+      <!-- LEFT：タイトル（最大幅を制限して、右にスペースを渡す） -->
+      <div class="flex items-center gap-2 min-w-0 lg:max-w-[360px]">
+        <div class="w-10 h-10 rounded-2xl bg-blue-600 shadow-lg shadow-blue-100 grid place-items-center shrink-0">
+          <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+              d="M4 17V7a2 2 0 0 1 2-2h9.5a2 2 0 0 1 1.4.6L20 8.7a2 2 0 0 1 .6 1.4V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
+            <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M4 10h16"/>
+          </svg>
+        </div>
 
-    <div class="min-w-0 leading-tight">
-      <div class="font-black tracking-tight text-base md:text-lg truncate">
-        大多喜小学校 スクールバス乗車確認
+        <div class="min-w-0 leading-tight">
+          <div class="text-base md:text-lg font-black tracking-tight truncate">
+            大多喜小学校 スクールバス乗車確認
+          </div>
+          <div class="text-[11px] font-bold text-slate-400 truncate">©2026 Takayuki WAYAMA</div>
+        </div>
       </div>
-      <div class="text-[11px] font-bold text-slate-400 truncate">©2026 Takayuki WAYAMA</div>
-    </div>
-  </div>
 
-  <!-- CENTER：日付ブロック（常にセンター） -->
-  <div class="lg:justify-self-center shrink-0">
-    <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200">
-      <button id="btn-prev-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="前日">◀</button>
-      <input id="date-picker" type="date" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-blue-500" />
-      <button id="btn-next-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="翌日">▶</button>
-      <div class="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black">下校</div>
-    </div>
-  </div>
-
-  <!-- RIGHT：状態/全画面/タブ（右寄せでまとまり） -->
-  <div class="flex items-center gap-2 flex-nowrap shrink-0 lg:justify-self-end">
-    <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">☁ 未接続</div>
-    <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">👤 未ログイン</div>
-    <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black whitespace-nowrap">全画面</button>
-
-    <nav class="ml-2">
-      <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap">
-        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
-        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
-        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-print" onclick="UI.switchTab('print')">印刷</button>
-        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-settings" onclick="UI.switchTab('settings')">名簿/設定</button>
+      <!-- CENTER：日付（常に中央） -->
+      <div class="lg:justify-self-center shrink-0">
+        <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200">
+          <button id="btn-prev-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="前日">◀</button>
+          <input id="date-picker" type="date" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-blue-500" />
+          <button id="btn-next-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="翌日">▶</button>
+          <div class="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black">下校</div>
+        </div>
       </div>
-    </nav>
-  </div>
-      <!-- ★ここまで -->
+
+      <!-- RIGHT：右は1frで広く取る + 狭い時は“縮む”より“横スクロール” -->
+      <div class="min-w-0 lg:justify-self-end">
+        <div class="flex items-center justify-end gap-2 flex-nowrap min-w-max
+                    overflow-x-auto lg:overflow-visible">
+          <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">☁ 未接続</div>
+          <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">👤 未ログイン</div>
+          <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black shrink-0">全画面</button>
+
+          <nav class="ml-2 shrink-0">
+            <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap">
+              <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
+              <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
+              <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-print" onclick="UI.switchTab('print')">印刷</button>
+              <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-settings" onclick="UI.switchTab('settings')">名簿/設定</button>
+            </div>
+          </nav>
+        </div>
+      </div>
+
     </div>
   </header>
 
@@ -618,7 +584,7 @@
   </main>
 
   <!-- Modal -->
-  <div id="modal" class="no-print hidden fixed inset-0 z-50">
+  <div id="modal" class="hidden fixed inset-0 z-50">
     <div class="absolute inset-0 modal-backdrop"></div>
     <div class="relative max-w-xl mx-auto mt-10 sm:mt-16 px-4">
       <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden">
@@ -653,7 +619,7 @@
   </div>
 
   <!-- Toast -->
-  <div class="no-print fixed bottom-4 left-0 right-0 z-50 pointer-events-none">
+  <div class="fixed bottom-4 left-0 right-0 z-50 pointer-events-none">
     <div id="toast" class="hidden toast-in mx-auto max-w-lg bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl pointer-events-auto">
       <div class="text-sm font-black" id="toast-msg">--</div>
     </div>
@@ -676,6 +642,7 @@ const PRESET_FIREBASE_CONFIG = {
   appId: "1:585729970166:web:556c33a05e58e48f9481d7",
   measurementId: "G-D0F2MEDCHE"
 };
+
 
 /* 共有単位（学校ID） */
 const PRESET_SCHOOL_ID = "otaki-es";
@@ -1235,8 +1202,7 @@ function renderOverview(){
   setAuthPill();
 }
 
-/* renderCheck / renderMonitor / renderPrint / CSV / Settings / fit（省略せず全部維持） */
-
+/* ここから先（renderCheck〜）はユーザー貼付のまま */
 function renderCheck(){
   const { roster, classes, classDone } = derived();
   const filter=$("#class-filter");
