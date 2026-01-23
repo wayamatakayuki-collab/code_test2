@@ -1,3 +1,6 @@
+以下のように差し替えたが，重なりが解消しない。
+
+＃現コード
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -197,14 +200,8 @@
 
     .modal-backdrop{ background:rgba(15,23,42,.55); }
 
-   /* ピルは縦積みでも横幅を暴れさせない（…で省略） */
-#cloud-pill, #auth-pill{
-  white-space: nowrap;
-  flex-shrink: 0;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+    /* ヘッダーのピルが縮んで縦書きになるのを防止（JSでclassが上書きされても効く） */
+    #cloud-pill, #auth-pill { white-space: nowrap; flex-shrink: 0; }
   </style>
 
   <!-- Firebase（このJSは window.firebase を使うので必須） -->
@@ -314,28 +311,21 @@
 
     <!-- RIGHT：右ははみ出したらこの領域だけ横スクロール（重なり防止） -->
     <div class="min-w-0 flex-1 lg:flex-none lg:justify-self-end overflow-x-auto">
-  <div class="flex items-center justify-end gap-2 flex-nowrap min-w-max">
+      <div class="flex items-center justify-end gap-2 flex-nowrap min-w-max">
+        <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">☁ 未接続</div>
+        <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">👤 未ログイン</div>
+        <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black shrink-0">全画面</button>
 
-    <!-- ★ここだけ縦積み（右幅が半分以下になる） -->
-    <div class="flex flex-col gap-1 items-end shrink-0">
-      <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">☁ 未接続</div>
-      <div id="auth-pill"  class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">👤 未ログイン</div>
-    </div>
-
-    <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black shrink-0">全画面</button>
-
-    <nav class="ml-2 shrink-0">
-      <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap">
-        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
-        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
-        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-print" onclick="UI.switchTab('print')">印刷</button>
-        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-settings" onclick="UI.switchTab('settings')">名簿/設定</button>
+        <nav class="ml-2 shrink-0">
+          <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap">
+            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
+            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
+            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-print" onclick="UI.switchTab('print')">印刷</button>
+            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-settings" onclick="UI.switchTab('settings')">名簿/設定</button>
+          </div>
+        </nav>
       </div>
-    </nav>
-
-  </div>
-</div>
-
+    </div>
 
   </div>
 </header>
