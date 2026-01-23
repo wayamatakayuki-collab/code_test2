@@ -311,43 +311,54 @@
 
   <header class="no-print sticky top-0 z-40 bg-white/75 backdrop-blur-md border-b border-slate-200">
     <!-- ★修正：折り返しをやめて1行固定 + 日付ブロックを左側へ -->
-    <div class="max-w-[1400px] mx-auto px-4 py-3 flex items-center gap-3 flex-nowrap overflow-x-auto">
-      <div class="flex items-center gap-2 shrink-0">
-        <div class="w-10 h-10 rounded-2xl bg-blue-600 shadow-lg shadow-blue-100 grid place-items-center">
-          <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-              d="M4 17V7a2 2 0 0 1 2-2h9.5a2 2 0 0 1 1.4.6L20 8.7a2 2 0 0 1 .6 1.4V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
-            <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M4 10h16"/>
-          </svg>
-        </div>
-        <div class="leading-tight">
-          <div class="text-lg font-black tracking-tight">大多喜小学校 スクールバス乗車確認</div>
-          <div class="text-[11px] font-bold text-slate-400">©2026 Takayuki WAYAMA</div>
-        </div>
-      </div>
+    <div class="max-w-[1400px] mx-auto px-4 py-3
+            flex items-center gap-3 flex-nowrap overflow-x-auto
+            lg:grid lg:grid-cols-[minmax(260px,1fr)_auto_minmax(420px,1fr)]
+            lg:items-center lg:gap-4 lg:overflow-visible">
 
-      <!-- 日付ブロック（左側へ移動） -->
-      <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200 shrink-0">
-        <button id="btn-prev-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="前日">◀</button>
-        <input id="date-picker" type="date" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-blue-500" />
-        <button id="btn-next-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="翌日">▶</button>
-      </div>
+  <!-- LEFT：タイトル（伸びすぎ防止 / 省略） -->
+  <div class="flex items-center gap-2 min-w-0 lg:overflow-hidden">
+    <div class="w-10 h-10 rounded-2xl bg-blue-600 shadow-lg shadow-blue-100 grid place-items-center shrink-0">
+      <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+          d="M4 17V7a2 2 0 0 1 2-2h9.5a2 2 0 0 1 1.4.6L20 8.7a2 2 0 0 1 .6 1.4V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
+        <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M4 10h16"/>
+      </svg>
+    </div>
 
-      <!-- ★修正：2行目に回っていた部分を上段（同一行）に固定 -->
-      <div class="flex items-center gap-2 flex-nowrap ml-auto shrink-0">
-        <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">☁ 未接続</div>
-        <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">👤 未ログイン</div>
-        <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black">全画面</button>
-
-        <nav class="ml-2">
-          <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 overflow-x-auto flex-nowrap whitespace-nowrap">
-            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
-            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
-            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-print" onclick="UI.switchTab('print')">印刷</button>
-            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-settings" onclick="UI.switchTab('settings')">名簿/設定</button>
-          </div>
-        </nav>
+    <div class="min-w-0 leading-tight">
+      <div class="font-black tracking-tight text-base md:text-lg truncate">
+        大多喜小学校 スクールバス乗車確認
       </div>
+      <div class="text-[11px] font-bold text-slate-400 truncate">©2026 Takayuki WAYAMA</div>
+    </div>
+  </div>
+
+  <!-- CENTER：日付ブロック（常にセンター） -->
+  <div class="lg:justify-self-center shrink-0">
+    <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200">
+      <button id="btn-prev-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="前日">◀</button>
+      <input id="date-picker" type="date" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-blue-500" />
+      <button id="btn-next-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="翌日">▶</button>
+      <div class="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black">下校</div>
+    </div>
+  </div>
+
+  <!-- RIGHT：状態/全画面/タブ（右寄せでまとまり） -->
+  <div class="flex items-center gap-2 flex-nowrap shrink-0 lg:justify-self-end">
+    <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">☁ 未接続</div>
+    <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">👤 未ログイン</div>
+    <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black whitespace-nowrap">全画面</button>
+
+    <nav class="ml-2">
+      <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap">
+        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
+        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
+        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-print" onclick="UI.switchTab('print')">印刷</button>
+        <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-settings" onclick="UI.switchTab('settings')">名簿/設定</button>
+      </div>
+    </nav>
+  </div>
       <!-- ★ここまで -->
     </div>
   </header>
