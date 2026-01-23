@@ -197,8 +197,14 @@
 
     .modal-backdrop{ background:rgba(15,23,42,.55); }
 
-    /* ヘッダーのピルが縮んで縦書きになるのを防止（JSでclassが上書きされても効く） */
-    #cloud-pill, #auth-pill { white-space: nowrap; flex-shrink: 0; }
+   /* ピルは縦積みでも横幅を暴れさせない（…で省略） */
+#cloud-pill, #auth-pill{
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
   </style>
 
   <!-- Firebase（このJSは window.firebase を使うので必須） -->
