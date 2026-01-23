@@ -16,29 +16,8 @@
     ::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:10px; }
     ::-webkit-scrollbar-thumb:hover{ background:#94a3b8; }
 
-    @media print{
+   @media print{
   .no-print{ display:none !important; }
-  body{ background:white !important; margin:0; padding:0; }
-  .print-shell{ max-width:100% !important; width:100% !important; padding:0 !important; margin:0 !important; }
-
-  /* ★A4縦向きに固定 */
-  @page{ size:A4 portrait; margin:7mm; }
-
-  /* 印刷ページ：最後だけ改ページしない（空白ページ対策） */
-  .print-page{
-    display:block;
-    width:100%;
-    margin:0 !important;
-    page-break-after:always;
-    break-after:page;
-  }
-
-  /* last-child が効かないケースがあるので last-of-type も併用 */
-  #print-content .print-page:last-child,
-  #print-content .print-page:last-of-type{
-    page-break-after:auto;
-    break-after:auto;
-  }
 
   /* 印刷時は印刷コンテンツだけ表示 */
   header,
@@ -54,134 +33,144 @@
     display:block !important;
   }
 
+  body{
+    background:white !important;
+    margin:0 !important;
+    padding:0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-shell{
+    max-width:100% !important;
+    width:100% !important;
+    padding:0 !important;
+    margin:0 !important;
+  }
+
+  /* ★A4縦向きに固定 */
+  @page{ size:A4 portrait; margin:7mm; }
+
   /* プレビュー枠の余白/装飾を落として印刷を綺麗に */
   #print-content{
     padding:0 !important;
     border:none !important;
     box-shadow:none !important;
+    background:transparent !important;
   }
+
+  /* =========================
+     ★白紙ページ対策（ここが肝）
+     - 末尾の改ページ(after)をやめる
+     - 2枚目以降の「前」で改ページ
+  ========================= */
+  #print-content .print-page{
+    display:block;
+    width:100%;
+    margin:0 !important;
+
+    /* 末尾改ページを禁止（白紙ページ根絶） */
+    page-break-after:auto !important;
+    break-after:auto !important;
+
+    /* 途中分割も抑止 */
+    page-break-inside:avoid !important;
+    break-inside:avoid !important;
+  }
+
+  /* 2ページ目以降の前で改ページ */
+  #print-content .print-page + .print-page{
+    page-break-before:always !important;
+    break-before:page !important;
+  }
+
+  /* 以降は既存スタイル（そのまま） */
+  .print-card{ border:2px solid #000 !important; box-shadow:none !important; }
+
+  .print-title{
+    border-bottom:3px solid #000 !important;
+    padding-bottom:2.2mm !important;
+    margin-bottom:2.2mm !important;
+  }
+  .print-title .print-title-en{ font-size:13pt !important; font-weight:900 !important; line-height:1.1 !important; }
+  .print-title .print-title-ja{ font-size:10.5pt !important; font-weight:900 !important; line-height:1.15 !important; }
+
+  table{ width:100% !important; border-collapse:collapse !important; table-layout:fixed !important; }
+  th,td{ border:1px solid #000 !important; vertical-align:middle; }
+
+  .td-name{ font-weight:900 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .td-stop{ white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+  .td-class{ font-weight:900 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important; text-align:center !important; }
+
+  .print-bus-card{
+    border:2px solid #000 !important;
+    padding:2.0mm !important;
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+  .print-bus-title{
+    font-size:10.5pt !important;
+    font-weight:900 !important;
+    margin:0 0 1.6mm 0 !important;
+    line-height:1.1 !important;
+  }
+
+  .print-bus-card .td-name,
+  .print-bus-card .td-class{
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+  }
+
+  .print-bus-card table th{
+    background:#f3f4f6 !important;
+    font-size:7.0pt !important;
+    padding:1.0mm 1.0mm !important;
+    line-height:1.02 !important;
+  }
+  .print-bus-card table td{
+    font-size:7.4pt !important;
+    padding:1.0mm 1.0mm !important;
+    line-height:1.02 !important;
+  }
+  .print-bus-card table tbody tr{ height:4.05mm; }
+
+  .print-page.bus-sheet{ padding:2.0mm !important; }
+  .bus-sheet .print-title{
+    padding-bottom:1.6mm !important;
+    margin-bottom:1.6mm !important;
+    border-bottom:3px solid #000 !important;
+  }
+  .bus-sheet .print-title .print-title-en{ font-size:11pt !important; }
+  .bus-sheet .print-title .print-title-ja{ font-size:9.2pt !important; }
+
+  .print-bus-sheet{
+    display:grid !important;
+    grid-template-rows:repeat(3, auto) !important;
+    gap:2.2mm !important;
+  }
+  .print-bus-sheet .print-bus-card{ padding:1.6mm !important; }
+  .print-bus-sheet .print-bus-title{ font-size:9.2pt !important; margin:0 0 1.2mm 0 !important; }
+  .print-bus-sheet .print-bus-card table th{ font-size:6.0pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
+  .print-bus-sheet .print-bus-card table td{ font-size:6.4pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
+  .print-bus-sheet .print-bus-card table tbody tr{ height:3.45mm; }
+
+  .print-class-card{
+    border:2px solid #000 !important;
+    padding:3mm !important;
+    margin-bottom:5mm !important;
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+  .print-class-title{
+    font-size:12pt !important;
+    font-weight:900 !important;
+    margin-bottom:2mm !important;
+  }
+
+  .compact td{ font-size:9pt !important; padding:5px 6px !important; }
+  .compact th{ font-size:8.5pt !important; padding:5px 6px !important; }
 }
 
-
-      .print-card{ border:2px solid #000 !important; box-shadow:none !important; }
-
-      .print-title{
-        border-bottom:3px solid #000 !important;
-        padding-bottom:2.2mm !important;
-        margin-bottom:2.2mm !important;
-      }
-      .print-title .print-title-en{ font-size:13pt !important; font-weight:900 !important; line-height:1.1 !important; }
-      .print-title .print-title-ja{ font-size:10.5pt !important; font-weight:900 !important; line-height:1.15 !important; }
-
-      table{ width:100% !important; border-collapse:collapse !important; table-layout:fixed !important; }
-      th,td{ border:1px solid #000 !important; vertical-align:middle; }
-
-      .td-name{ font-weight:900 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .td-stop{ white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
-      .td-class{ font-weight:900 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important; text-align:center !important; }
-
-      .print-bus-card{
-        border:2px solid #000 !important;
-        padding:2.0mm !important;
-        page-break-inside:avoid;
-      }
-      .print-bus-title{
-        font-size:10.5pt !important;
-        font-weight:900 !important;
-        margin:0 0 1.6mm 0 !important;
-        line-height:1.1 !important;
-      }
-
-      .print-bus-card .td-name,
-      .print-bus-card .td-class{
-        white-space:nowrap !important;
-        overflow:hidden !important;
-        text-overflow:ellipsis !important;
-      }
-
-      .print-bus-card table th{
-        background:#f3f4f6 !important;
-        font-size:7.0pt !important;
-        padding:1.0mm 1.0mm !important;
-        line-height:1.02 !important;
-      }
-      .print-bus-card table td{
-        font-size:7.4pt !important;
-        padding:1.0mm 1.0mm !important;
-        line-height:1.02 !important;
-      }
-      .print-bus-card table tbody tr{ height:4.05mm; }
-
-      .print-page.bus-sheet{ padding:2.0mm !important; }
-      .bus-sheet .print-title{
-        padding-bottom:1.6mm !important;
-        margin-bottom:1.6mm !important;
-        border-bottom:3px solid #000 !important;
-      }
-      .bus-sheet .print-title .print-title-en{ font-size:11pt !important; }
-      .bus-sheet .print-title .print-title-ja{ font-size:9.2pt !important; }
-
-      .print-bus-sheet{
-        display:grid !important;
-        grid-template-rows:repeat(3, auto) !important;
-        gap:2.2mm !important;
-      }
-      .print-bus-sheet .print-bus-card{ padding:1.6mm !important; }
-      .print-bus-sheet .print-bus-title{ font-size:9.2pt !important; margin:0 0 1.2mm 0 !important; }
-      .print-bus-sheet .print-bus-card table th{ font-size:6.0pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
-      .print-bus-sheet .print-bus-card table td{ font-size:6.4pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
-      .print-bus-sheet .print-bus-card table tbody tr{ height:3.45mm; }
-
-      .print-class-card{
-        border:2px solid #000 !important;
-        padding:3mm !important;
-        margin-bottom:5mm !important;
-        page-break-inside:avoid;
-      }
-      .print-class-title{
-        font-size:12pt !important;
-        font-weight:900 !important;
-        margin-bottom:2mm !important;
-      }
-
-      .compact td{ font-size:9pt !important; padding:5px 6px !important; }
-      .compact th{ font-size:8.5pt !important; padding:5px 6px !important; }
-    }
-
-    .tap{ transition:transform .08s ease, box-shadow .08s ease; }
-    .tap:active{ transform:scale(.98); }
-
-    .tab-active{
-      background:#eff6ff;
-      border-bottom:3px solid #2563eb;
-      color:#1e3a8a;
-      font-weight:900;
-    }
-
-    .chip{ display:inline-flex; align-items:center; gap:.35rem; padding:.18rem .5rem; border-radius:.65rem; font-weight:900; font-size:11px; border:1px solid transparent; white-space:nowrap; line-height:1; }
-    .chip-none{ background:#f8fafc; color:#64748b; border-color:#e2e8f0; }
-    .chip-ride{ background:#dbeafe; color:#1e40af; border-color:#bfdbfe; }
-    .chip-absent{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
-    .chip-pickup{ background:#dcfce7; color:#14532d; border-color:#bbf7d0; }
-    .chip-other{ background:#fef3c7; color:#78350f; border-color:#fde68a; }
-
-    .bus-u{ background-color:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; }
-    .bus-s{ background-color:#fef3c7; color:#92400e; border:1px solid #fde68a; }
-    .bus-t{ background-color:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
-
-    .toast-in{ animation:toastIn .18s ease-out; }
-    @keyframes toastIn{ from{ transform:translateY(8px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
-
-    .modal-backdrop{ background:rgba(15,23,42,.55); }
-  </style>
-
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
-</head>
-
-<body class="bg-slate-50 text-slate-800 min-h-screen">
 
   <!-- Login Overlay（SchoolCal方式：設定画面なし。ログイン後、自動でクラウド共有） -->
   <div id="login-overlay" class="fixed inset-0 z-[60] hidden">
