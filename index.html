@@ -22,6 +22,31 @@
     @media print{
   .no-print{ display:none !important; }
 
+  /* =========================
+     ★Edge白紙ページ対策（追加）
+     1) body の min-h-screen(=min-height:100vh) を印刷では無効化
+     2) section-print の space-y-* が display:none でも余白を作るのを無効化
+     3) fixed系（オーバーレイ/トースト/モーダル）を完全排除
+  ========================= */
+  html, body{
+    height:auto !important;
+    min-height:auto !important;
+  }
+
+  #section-print{
+    padding:0 !important;
+    margin:0 !important;
+  }
+  /* Tailwindのspace-y-*対策（display:noneでもmarginが残ることがある） */
+  #section-print > :not([hidden]) ~ :not([hidden]){
+    margin-top:0 !important;
+  }
+
+  #login-overlay, #cloud-error-overlay, #modal,
+  #toast, #toast *{
+    display:none !important;
+  }
+
   /* 印刷時は印刷コンテンツだけ表示 */
   header,
   #section-overview,
@@ -40,9 +65,16 @@
     background:white !important;
     margin:0 !important;
     padding:0 !important;
+
+    /* ★Edge白紙対策：100vh系・スクロール系を印刷では解除 */
+    height:auto !important;
+    min-height:auto !important;
+    overflow:visible !important;
+
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
   .print-shell{
     max-width:100% !important;
     width:100% !important;
@@ -53,9 +85,11 @@
   /* プレビュー枠の余白/装飾を落として印刷を綺麗に */
   #print-content{
     padding:0 !important;
+    margin:0 !important;
     border:none !important;
     box-shadow:none !important;
     background:transparent !important;
+    overflow:visible !important;
   }
 
   /* =========================
@@ -83,10 +117,10 @@
     break-before:page !important;
   }
 
-  /* ★追加：最後のページの末尾で“強制的に次ページ”を作らせない（空白ページ対策の念押し） */
+  /* ★念押し：最後のページの末尾で“強制的に次ページ”を作らせない */
   #print-content > .print-page:last-child{
-    page-break-after: avoid !important;
-    break-after: avoid-page !important;
+    page-break-after:auto !important;
+    break-after:auto !important;
   }
 
   /* 以降は既存スタイル（そのまま） */
@@ -177,6 +211,7 @@
   .compact td{ font-size:9pt !important; padding:5px 6px !important; }
   .compact th{ font-size:8.5pt !important; padding:5px 6px !important; }
 }
+
 
 
     .tap{ transition:transform .08s ease, box-shadow .08s ease; }
