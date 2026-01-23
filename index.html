@@ -20,156 +20,164 @@
     @page{ size:A4 portrait; margin:7mm; }
 
     @media print{
-      .no-print{ display:none !important; }
+  .no-print{ display:none !important; }
 
-      /* 印刷時は印刷コンテンツだけ表示 */
-      header,
-      #section-overview,
-      #section-check,
-      #section-monitor,
-      #section-settings{
-        display:none !important;
-      }
+  /* 印刷時は印刷コンテンツだけ表示 */
+  header,
+  #section-overview,
+  #section-check,
+  #section-monitor,
+  #section-settings{
+    display:none !important;
+  }
 
-      /* hidden が付いていても印刷だけは出す（印刷タブの中身） */
-      #section-print{
-        display:block !important;
-      }
+  /* hidden が付いていても印刷だけは出す（印刷タブの中身） */
+  #section-print{
+    display:block !important;
+  }
 
-      body{
-        background:white !important;
-        margin:0 !important;
-        padding:0 !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      .print-shell{
-        max-width:100% !important;
-        width:100% !important;
-        padding:0 !important;
-        margin:0 !important;
-      }
+  body{
+    background:white !important;
+    margin:0 !important;
+    padding:0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-shell{
+    max-width:100% !important;
+    width:100% !important;
+    padding:0 !important;
+    margin:0 !important;
+  }
 
-      /* プレビュー枠の余白/装飾を落として印刷を綺麗に */
-      #print-content{
-        padding:0 !important;
-        border:none !important;
-        box-shadow:none !important;
-        background:transparent !important;
-      }
+  /* プレビュー枠の余白/装飾を落として印刷を綺麗に */
+  #print-content{
+    padding:0 !important;
+    border:none !important;
+    box-shadow:none !important;
+    background:transparent !important;
+  }
 
-      /* =========================
-         ★白紙ページ対策（ここが肝）
-         - 末尾の改ページ(after)をやめる
-         - 2枚目以降の「前」で改ページ
-      ========================= */
-      #print-content .print-page{
-        display:block;
-        width:100%;
-        margin:0 !important;
+  /* =========================
+     ★白紙ページ対策（ここが肝）
+     - 末尾の改ページ(after)をやめる
+     - 2枚目以降の「前」で改ページ
+  ========================= */
+  #print-content .print-page{
+    display:block;
+    width:100%;
+    margin:0 !important;
 
-        /* 末尾改ページを禁止（白紙ページ根絶） */
-        page-break-after:auto !important;
-        break-after:auto !important;
+    /* 末尾改ページを禁止（白紙ページ根絶） */
+    page-break-after:auto !important;
+    break-after:auto !important;
 
-        /* 途中分割も抑止 */
-        page-break-inside:avoid !important;
-        break-inside:avoid !important;
-      }
+    /* 途中分割も抑止 */
+    page-break-inside:avoid !important;
+    break-inside:avoid !important;
+  }
 
-      /* 2ページ目以降の前で改ページ */
-      #print-content .print-page + .print-page{
-        page-break-before:always !important;
-        break-before:page !important;
-      }
+  /* 2ページ目以降の前で改ページ */
+  #print-content .print-page + .print-page{
+    page-break-before:always !important;
+    break-before:page !important;
+  }
 
-      /* 以降は既存スタイル（そのまま） */
-      .print-card{ border:2px solid #000 !important; box-shadow:none !important; }
+  /* ★追加：最後のページの末尾で“強制的に次ページ”を作らせない（空白ページ対策の念押し） */
+  #print-content > .print-page:last-child{
+    page-break-after: avoid !important;
+    break-after: avoid-page !important;
+  }
 
-      .print-title{
-        border-bottom:3px solid #000 !important;
-        padding-bottom:2.2mm !important;
-        margin-bottom:2.2mm !important;
-      }
-      .print-title .print-title-en{ font-size:13pt !important; font-weight:900 !important; line-height:1.1 !important; }
-      .print-title .print-title-ja{ font-size:10.5pt !important; font-weight:900 !important; line-height:1.15 !important; }
+  /* 以降は既存スタイル（そのまま） */
+  .print-card{ border:2px solid #000 !important; box-shadow:none !important; }
 
-      table{ width:100% !important; border-collapse:collapse !important; table-layout:fixed !important; }
-      th,td{ border:1px solid #000 !important; vertical-align:middle; }
+  .print-title{
+    border-bottom:3px solid #000 !important;
+    padding-bottom:2.2mm !important;
+    margin-bottom:2.2mm !important;
+  }
+  .print-title .print-title-en{ font-size:13pt !important; font-weight:900 !important; line-height:1.1 !important; }
+  .print-title .print-title-ja{ font-size:10.5pt !important; font-weight:900 !important; line-height:1.15 !important; }
 
-      .td-name{ font-weight:900 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .td-stop{ white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
-      .td-class{ font-weight:900 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important; text-align:center !important; }
+  table{ width:100% !important; border-collapse:collapse !important; table-layout:fixed !important; }
+  th,td{ border:1px solid #000 !important; vertical-align:middle; }
 
-      .print-bus-card{
-        border:2px solid #000 !important;
-        padding:2.0mm !important;
-        page-break-inside:avoid;
-        break-inside:avoid;
-      }
-      .print-bus-title{
-        font-size:10.5pt !important;
-        font-weight:900 !important;
-        margin:0 0 1.6mm 0 !important;
-        line-height:1.1 !important;
-      }
+  .td-name{ font-weight:900 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .td-stop{ white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+  .td-class{ font-weight:900 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important; text-align:center !important; }
 
-      .print-bus-card .td-name,
-      .print-bus-card .td-class{
-        white-space:nowrap !important;
-        overflow:hidden !important;
-        text-overflow:ellipsis !important;
-      }
+  .print-bus-card{
+    border:2px solid #000 !important;
+    padding:2.0mm !important;
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+  .print-bus-title{
+    font-size:10.5pt !important;
+    font-weight:900 !important;
+    margin:0 0 1.6mm 0 !important;
+    line-height:1.1 !important;
+  }
 
-      .print-bus-card table th{
-        background:#f3f4f6 !important;
-        font-size:7.0pt !important;
-        padding:1.0mm 1.0mm !important;
-        line-height:1.02 !important;
-      }
-      .print-bus-card table td{
-        font-size:7.4pt !important;
-        padding:1.0mm 1.0mm !important;
-        line-height:1.02 !important;
-      }
-      .print-bus-card table tbody tr{ height:4.05mm; }
+  .print-bus-card .td-name,
+  .print-bus-card .td-class{
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+  }
 
-      .print-page.bus-sheet{ padding:2.0mm !important; }
-      .bus-sheet .print-title{
-        padding-bottom:1.6mm !important;
-        margin-bottom:1.6mm !important;
-        border-bottom:3px solid #000 !important;
-      }
-      .bus-sheet .print-title .print-title-en{ font-size:11pt !important; }
-      .bus-sheet .print-title .print-title-ja{ font-size:9.2pt !important; }
+  .print-bus-card table th{
+    background:#f3f4f6 !important;
+    font-size:7.0pt !important;
+    padding:1.0mm 1.0mm !important;
+    line-height:1.02 !important;
+  }
+  .print-bus-card table td{
+    font-size:7.4pt !important;
+    padding:1.0mm 1.0mm !important;
+    line-height:1.02 !important;
+  }
+  .print-bus-card table tbody tr{ height:4.05mm; }
 
-      .print-bus-sheet{
-        display:grid !important;
-        grid-template-rows:repeat(3, auto) !important;
-        gap:2.2mm !important;
-      }
-      .print-bus-sheet .print-bus-card{ padding:1.6mm !important; }
-      .print-bus-sheet .print-bus-title{ font-size:9.2pt !important; margin:0 0 1.2mm 0 !important; }
-      .print-bus-sheet .print-bus-card table th{ font-size:6.0pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
-      .print-bus-sheet .print-bus-card table td{ font-size:6.4pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
-      .print-bus-sheet .print-bus-card table tbody tr{ height:3.45mm; }
+  .print-page.bus-sheet{ padding:2.0mm !important; }
+  .bus-sheet .print-title{
+    padding-bottom:1.6mm !important;
+    margin-bottom:1.6mm !important;
+    border-bottom:3px solid #000 !important;
+  }
+  .bus-sheet .print-title .print-title-en{ font-size:11pt !important; }
+  .bus-sheet .print-title .print-title-ja{ font-size:9.2pt !important; }
 
-      .print-class-card{
-        border:2px solid #000 !important;
-        padding:3mm !important;
-        margin-bottom:5mm !important;
-        page-break-inside:avoid;
-        break-inside:avoid;
-      }
-      .print-class-title{
-        font-size:12pt !important;
-        font-weight:900 !important;
-        margin-bottom:2mm !important;
-      }
+  /* ★差し替え：印刷時は grid をやめる（Chrome/Edgeの“最後に白紙ページ”対策） */
+  .print-bus-sheet{ display:block !important; }
+  .print-bus-sheet .print-bus-card{ margin:0 0 2.2mm 0 !important; }
+  .print-bus-sheet .print-bus-card:last-child{ margin-bottom:0 !important; }
 
-      .compact td{ font-size:9pt !important; padding:5px 6px !important; }
-      .compact th{ font-size:8.5pt !important; padding:5px 6px !important; }
-    }
+  /* ↓ここから下は“あなたの既存”をそのまま維持（上のgrid指定だけ除去） */
+  .print-bus-sheet .print-bus-card{ padding:1.6mm !important; }
+  .print-bus-sheet .print-bus-title{ font-size:9.2pt !important; margin:0 0 1.2mm 0 !important; }
+  .print-bus-sheet .print-bus-card table th{ font-size:6.0pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
+  .print-bus-sheet .print-bus-card table td{ font-size:6.4pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
+  .print-bus-sheet .print-bus-card table tbody tr{ height:3.45mm; }
+
+  .print-class-card{
+    border:2px solid #000 !important;
+    padding:3mm !important;
+    margin-bottom:5mm !important;
+    page-break-inside:avoid;
+    break-inside:avoid;
+  }
+  .print-class-title{
+    font-size:12pt !important;
+    font-weight:900 !important;
+    margin-bottom:2mm !important;
+  }
+
+  .compact td{ font-size:9pt !important; padding:5px 6px !important; }
+  .compact th{ font-size:8.5pt !important; padding:5px 6px !important; }
+}
+
 
     .tap{ transition:transform .08s ease, box-shadow .08s ease; }
     .tap:active{ transform:scale(.98); }
