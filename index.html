@@ -7,17 +7,62 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
 
+  <!-- Firebase (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap');
-    body { font-family: 'Inter','Noto Sans JP',system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: 'Inter','Noto Sans JP',system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
 
     ::-webkit-scrollbar{ width:8px; height:8px; }
     ::-webkit-scrollbar-track{ background:#eef2ff; }
     ::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:10px; }
     ::-webkit-scrollbar-thumb:hover{ background:#94a3b8; }
 
-    /* ★A4縦向きに固定（@media の外に出す方が安定） */
-    @page{ size:A4 portrait; margin:7mm; }
+    /* UI small helpers */
+    .tap { user-select:none; -webkit-user-select:none; }
+    .tap:active { transform: translateY(1px) scale(0.99); }
+
+    .tab-active{
+      background:#fff;
+      border:1px solid #e2e8f0;
+      color:#0f172a;
+      font-weight:900;
+      box-shadow: 0 1px 0 rgba(15,23,42,.04);
+    }
+
+    .modal-backdrop{ background: rgba(2,6,23,0.6); }
+
+    .toast-in{ animation: toastIn .18s ease-out; }
+    @keyframes toastIn{
+      from{ opacity:0; transform: translateY(6px) scale(.98); }
+      to{ opacity:1; transform:none; }
+    }
+
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:.4rem;
+      padding:.35rem .6rem;
+      border-radius:9999px;
+      border:1px solid #e2e8f0;
+      background:#f8fafc;
+      color:#0f172a;
+      font-size:11px;
+      font-weight:900;
+      line-height:1;
+      white-space:nowrap;
+    }
+    .chip-none{ background:#f1f5f9; border-color:#e2e8f0; color:#475569; }
+    .chip-ride{ background:#ecfdf5; border-color:#a7f3d0; color:#047857; }
+    .chip-absent{ background:#f1f5f9; border-color:#cbd5e1; color:#475569; }
+    .chip-pickup{ background:#ecfeff; border-color:#a5f3fc; color:#0e7490; }
+    .chip-other{ background:#fffbeb; border-color:#fde68a; color:#92400e; }
 
     @media print{
       .no-print{ display:none !important; }
@@ -36,13 +81,15 @@
         display:block !important;
       }
 
-      body{
+      html, body{
+        height:auto !important;
         background:white !important;
         margin:0 !important;
         padding:0 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
       }
+
       .print-shell{
         max-width:100% !important;
         width:100% !important;
@@ -50,40 +97,46 @@
         margin:0 !important;
       }
 
+      /* ★A4縦向きに固定 */
+      @page{ size:A4 portrait; margin:7mm; }
+
       /* プレビュー枠の余白/装飾を落として印刷を綺麗に */
       #print-content{
         padding:0 !important;
+        margin:0 !important;
         border:none !important;
         box-shadow:none !important;
         background:transparent !important;
+        overflow:visible !important;
       }
 
       /* =========================
-         ★白紙ページ対策（ここが肝）
-         - 末尾の改ページ(after)をやめる
-         - 2枚目以降の「前」で改ページ
+         ★白紙ページ対策（Edge向け強化）
+         - 末尾の改ページを明示的に避ける
+         - 最終ページは break-after: avoid を強制
       ========================= */
       #print-content .print-page{
         display:block;
         width:100%;
         margin:0 !important;
 
-        /* 末尾改ページを禁止（白紙ページ根絶） */
         page-break-after:auto !important;
         break-after:auto !important;
 
-        /* 途中分割も抑止 */
         page-break-inside:avoid !important;
         break-inside:avoid !important;
-      }
 
-      /* 2ページ目以降の前で改ページ */
+        border-radius:0 !important; /* 印刷は角丸不要（僅差のはみ出し対策） */
+      }
+      #print-content .print-page:last-child{
+        page-break-after:avoid !important;
+        break-after:avoid !important;
+      }
       #print-content .print-page + .print-page{
         page-break-before:always !important;
         break-before:page !important;
       }
 
-      /* 以降は既存スタイル（そのまま） */
       .print-card{ border:2px solid #000 !important; box-shadow:none !important; }
 
       .print-title{
@@ -101,58 +154,65 @@
       .td-stop{ white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
       .td-class{ font-weight:900 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important; text-align:center !important; }
 
-      .print-bus-card{
-        border:2px solid #000 !important;
-        padding:2.0mm !important;
-        page-break-inside:avoid;
-        break-inside:avoid;
-      }
-      .print-bus-title{
-        font-size:10.5pt !important;
-        font-weight:900 !important;
-        margin:0 0 1.6mm 0 !important;
-        line-height:1.1 !important;
-      }
-
-      .print-bus-card .td-name,
-      .print-bus-card .td-class{
+      /* ★バス別のバス停は1行省略（はみ出し/改ページ防止） */
+      .td-stop-bus{
+        font-weight:800 !important;
         white-space:nowrap !important;
         overflow:hidden !important;
         text-overflow:ellipsis !important;
       }
 
+      .print-bus-card{
+        border:2px solid #000 !important;
+        padding:1.6mm !important;
+        page-break-inside:avoid;
+        break-inside:avoid;
+      }
+      .print-bus-title{
+        font-size:9.6pt !important;
+        font-weight:900 !important;
+        margin:0 0 1.2mm 0 !important;
+        line-height:1.1 !important;
+      }
+
+      .print-bus-card .td-name,
+      .print-bus-card .td-class,
+      .print-bus-card .td-stop-bus{
+        white-space:nowrap !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+      }
+
+      /* ★列が増えるので少しだけ詰める */
       .print-bus-card table th{
         background:#f3f4f6 !important;
-        font-size:7.0pt !important;
-        padding:1.0mm 1.0mm !important;
+        font-size:6.0pt !important;
+        padding:0.8mm 0.8mm !important;
         line-height:1.02 !important;
       }
       .print-bus-card table td{
-        font-size:7.4pt !important;
-        padding:1.0mm 1.0mm !important;
+        font-size:6.2pt !important;
+        padding:0.8mm 0.8mm !important;
         line-height:1.02 !important;
       }
-      .print-bus-card table tbody tr{ height:4.05mm; }
+      .print-bus-card table tbody tr{ height:3.35mm; }
 
-      .print-page.bus-sheet{ padding:2.0mm !important; }
+      .print-page.bus-sheet{ padding:1.6mm !important; }
+
       .bus-sheet .print-title{
-        padding-bottom:1.6mm !important;
-        margin-bottom:1.6mm !important;
+        padding-bottom:1.4mm !important;
+        margin-bottom:1.4mm !important;
         border-bottom:3px solid #000 !important;
       }
       .bus-sheet .print-title .print-title-en{ font-size:11pt !important; }
       .bus-sheet .print-title .print-title-ja{ font-size:9.2pt !important; }
 
+      /* ★Edge印刷の白紙対策：gridをやめてflex縦並びに（印刷のみ） */
       .print-bus-sheet{
-        display:grid !important;
-        grid-template-rows:repeat(3, auto) !important;
-        gap:2.2mm !important;
+        display:flex !important;
+        flex-direction:column !important;
+        gap:1.6mm !important;
       }
-      .print-bus-sheet .print-bus-card{ padding:1.6mm !important; }
-      .print-bus-sheet .print-bus-title{ font-size:9.2pt !important; margin:0 0 1.2mm 0 !important; }
-      .print-bus-sheet .print-bus-card table th{ font-size:6.0pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
-      .print-bus-sheet .print-bus-card table td{ font-size:6.4pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
-      .print-bus-sheet .print-bus-card table tbody tr{ height:3.45mm; }
 
       .print-class-card{
         border:2px solid #000 !important;
@@ -170,43 +230,13 @@
       .compact td{ font-size:9pt !important; padding:5px 6px !important; }
       .compact th{ font-size:8.5pt !important; padding:5px 6px !important; }
     }
-
-    .tap{ transition:transform .08s ease, box-shadow .08s ease; }
-    .tap:active{ transform:scale(.98); }
-
-    .tab-active{
-      background:#eff6ff;
-      border-bottom:3px solid #2563eb;
-      color:#1e3a8a;
-      font-weight:900;
-    }
-
-    .chip{ display:inline-flex; align-items:center; gap:.35rem; padding:.18rem .5rem; border-radius:.65rem; font-weight:900; font-size:11px; border:1px solid transparent; white-space:nowrap; line-height:1; }
-    .chip-none{ background:#f8fafc; color:#64748b; border-color:#e2e8f0; }
-    .chip-ride{ background:#dbeafe; color:#1e40af; border-color:#bfdbfe; }
-    .chip-absent{ background:#f1f5f9; color:#475569; border-color:#e2e8f0; }
-    .chip-pickup{ background:#dcfce7; color:#14532d; border-color:#bbf7d0; }
-    .chip-other{ background:#fef3c7; color:#78350f; border-color:#fde68a; }
-
-    .bus-u{ background-color:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; }
-    .bus-s{ background-color:#fef3c7; color:#92400e; border:1px solid #fde68a; }
-    .bus-t{ background-color:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
-
-    .toast-in{ animation:toastIn .18s ease-out; }
-    @keyframes toastIn{ from{ transform:translateY(8px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
-
-    .modal-backdrop{ background:rgba(15,23,42,.55); }
   </style>
-
-  <!-- Firebase（このJSは window.firebase を使うので必須） -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 </head>
 
-<body class="bg-slate-50 text-slate-800 min-h-screen">
+<body>
+
   <!-- Login Overlay（SchoolCal方式：設定画面なし。ログイン後、自動でクラウド共有） -->
-  <div id="login-overlay" class="fixed inset-0 z-[60] hidden">
+  <div id="login-overlay" class="no-print fixed inset-0 z-[60] hidden">
     <div class="absolute inset-0 bg-slate-950/60"></div>
     <div class="relative max-w-md mx-auto mt-16 px-4">
       <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden">
@@ -243,7 +273,7 @@
   </div>
 
   <!-- Cloud Error Overlay（クラウド必須：失敗時にローカルへ黙って落ちない） -->
-  <div id="cloud-error-overlay" class="fixed inset-0 z-[55] hidden">
+  <div id="cloud-error-overlay" class="no-print fixed inset-0 z-[55] hidden">
     <div class="absolute inset-0 bg-slate-950/60"></div>
     <div class="relative max-w-2xl mx-auto mt-14 px-4">
       <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden">
@@ -565,7 +595,7 @@
   </main>
 
   <!-- Modal -->
-  <div id="modal" class="hidden fixed inset-0 z-50">
+  <div id="modal" class="no-print hidden fixed inset-0 z-50">
     <div class="absolute inset-0 modal-backdrop"></div>
     <div class="relative max-w-xl mx-auto mt-10 sm:mt-16 px-4">
       <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden">
@@ -600,7 +630,7 @@
   </div>
 
   <!-- Toast -->
-  <div class="fixed bottom-4 left-0 right-0 z-50 pointer-events-none">
+  <div class="no-print fixed bottom-4 left-0 right-0 z-50 pointer-events-none">
     <div id="toast" class="hidden toast-in mx-auto max-w-lg bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-2xl pointer-events-auto">
       <div class="text-sm font-black" id="toast-msg">--</div>
     </div>
@@ -623,7 +653,6 @@ const PRESET_FIREBASE_CONFIG = {
   appId: "1:585729970166:web:556c33a05e58e48f9481d7",
   measurementId: "G-D0F2MEDCHE"
 };
-
 
 /* 共有単位（学校ID） */
 const PRESET_SCHOOL_ID = "otaki-es";
@@ -1183,7 +1212,8 @@ function renderOverview(){
   setAuthPill();
 }
 
-/* ここから先（renderCheck〜）はユーザー貼付のまま */
+/* renderCheck / renderMonitor / renderPrint / CSV / Settings / fit（省略せず全部維持） */
+
 function renderCheck(){
   const { roster, classes, classDone } = derived();
   const filter=$("#class-filter");
@@ -1289,8 +1319,7 @@ function renderCheck(){
   }
 }
 
-/* 以下、ユーザー貼付のまま（renderMonitor〜Boot） */
-function renderMonitor(){ /* 元コードそのまま */ 
+function renderMonitor(){
   const { roster, classes, classDone, busCounts, rideCount, doneCount } = derived();
 
   $("#monitor-summary").innerHTML = `
@@ -1394,7 +1423,7 @@ function renderMonitor(){ /* 元コードそのまま */
   }
 }
 
-function renderPrint(){ /* 元コードそのまま */ 
+function renderPrint(){
   const { roster, classes } = derived();
   const mode = State.printMode;
   const title = `スクールバス乗車名簿（${jpDateLabel(State.date)} / 下校）`;
@@ -1430,23 +1459,28 @@ function renderPrint(){ /* 元コードそのまま */
       const right = rows.slice(half);
       const maxN = Math.max(left.length, right.length);
 
+      /* ★修正：バス停を氏名の右に追加（2列維持） */
       card.innerHTML = `
         <div class="print-bus-title">■ ${busName}（${rows.length}名）</div>
         <table>
           <colgroup>
-            <col style="width:18%;">
-            <col style="width:8%;">
-            <col style="width:21%;">
-            <col style="width:3%;">
-            <col style="width:18%;">
-            <col style="width:8%;">
-            <col style="width:21%;">
-            <col style="width:3%;">
+            <!-- 左（合計50%） -->
+            <col style="width:10%;">
+            <col style="width:5%;">
+            <col style="width:14%;">
+            <col style="width:19%;">
+            <col style="width:2%;">
+            <!-- 右（合計50%） -->
+            <col style="width:10%;">
+            <col style="width:5%;">
+            <col style="width:14%;">
+            <col style="width:19%;">
+            <col style="width:2%;">
           </colgroup>
           <thead>
             <tr>
-              <th>クラス</th><th>番号</th><th>氏名</th><th>□</th>
-              <th>クラス</th><th>番号</th><th>氏名</th><th>□</th>
+              <th>クラス</th><th>番</th><th>氏名</th><th>バス停</th><th>□</th>
+              <th>クラス</th><th>番</th><th>氏名</th><th>バス停</th><th>□</th>
             </tr>
           </thead>
           <tbody>
@@ -1459,32 +1493,40 @@ function renderPrint(){ /* 元コードそのまま */
                   const aCls = a ? formatClassLabel(a.class) : "";
                   const bCls = b ? formatClassLabel(b.class) : "";
 
-                  const aClsPt = a ? fitFontPt(aCls, 7.4, 6, 6.0) : null;
-                  const bClsPt = b ? fitFontPt(bCls, 7.4, 6, 6.0) : null;
+                  const basePt = 6.2; /* ★少し詰める */
+                  const aClsPt = a ? fitFontPt(aCls, basePt, 6, 5.6) : null;
+                  const bClsPt = b ? fitFontPt(bCls, basePt, 6, 5.6) : null;
 
-                  const aNamePt = a ? fitFontPt(a.name, 7.4, 7, 5.8) : null;
-                  const bNamePt = b ? fitFontPt(b.name, 7.4, 7, 5.8) : null;
+                  const aNamePt = a ? fitFontPt(a.name, basePt, 7, 5.4) : null;
+                  const bNamePt = b ? fitFontPt(b.name, basePt, 7, 5.4) : null;
+
+                  const aStopPt = a ? fitFontPt(a.stop, basePt, 10, 5.4) : null;
+                  const bStopPt = b ? fitFontPt(b.stop, basePt, 10, 5.4) : null;
 
                   const aClsStyle = aClsPt ? `font-size:${aClsPt}pt !important;` : "";
                   const bClsStyle = bClsPt ? `font-size:${bClsPt}pt !important;` : "";
                   const aNameStyle = aNamePt ? `font-size:${aNamePt}pt !important;` : "";
                   const bNameStyle = bNamePt ? `font-size:${bNamePt}pt !important;` : "";
+                  const aStopStyle = aStopPt ? `font-size:${aStopPt}pt !important;` : "";
+                  const bStopStyle = bStopPt ? `font-size:${bStopPt}pt !important;` : "";
 
                   return `
                     <tr>
                       <td class="td-class" style="${aClsStyle}">${a ? esc(aCls) : ""}</td>
                       <td style="text-align:center; font-weight:800; white-space:nowrap;">${a ? a.num : ""}</td>
                       <td class="td-name" style="${aNameStyle}">${a ? esc(a.name) : ""}</td>
+                      <td class="td-stop-bus" style="${aStopStyle}">${a ? esc(a.stop) : ""}</td>
                       <td style="text-align:center;">${a ? "□" : ""}</td>
 
                       <td class="td-class" style="${bClsStyle}">${b ? esc(bCls) : ""}</td>
                       <td style="text-align:center; font-weight:800; white-space:nowrap;">${b ? b.num : ""}</td>
                       <td class="td-name" style="${bNameStyle}">${b ? esc(b.name) : ""}</td>
+                      <td class="td-stop-bus" style="${bStopStyle}">${b ? esc(b.stop) : ""}</td>
                       <td style="text-align:center;">${b ? "□" : ""}</td>
                     </tr>
                   `;
                 }).join("")
-              : `<tr><td colspan="8" style="text-align:center; padding:3mm; font-weight:900; color:#64748b;">乗車予定なし</td></tr>`
+              : `<tr><td colspan="10" style="text-align:center; padding:3mm; font-weight:900; color:#64748b;">乗車予定なし</td></tr>`
             }
           </tbody>
         </table>
