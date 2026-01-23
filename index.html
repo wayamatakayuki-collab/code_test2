@@ -15,7 +15,7 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap');
     body {
-      font-family: 'Inter','Noto Sans JP',system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+      font-family: 'Inter','Noto+Sans+JP',system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
       -webkit-tap-highlight-color: transparent;
     }
 
@@ -310,8 +310,9 @@
   </div>
 
   <header class="no-print sticky top-0 z-40 bg-white/75 backdrop-blur-md border-b border-slate-200">
-    <div class="max-w-[1400px] mx-auto px-4 py-3 flex flex-wrap items-center gap-3">
-      <div class="flex items-center gap-2 mr-auto">
+    <!-- ★修正：折り返しをやめて1行固定 + 日付ブロックを左側へ -->
+    <div class="max-w-[1400px] mx-auto px-4 py-3 flex items-center gap-3 flex-nowrap overflow-x-auto">
+      <div class="flex items-center gap-2 shrink-0">
         <div class="w-10 h-10 rounded-2xl bg-blue-600 shadow-lg shadow-blue-100 grid place-items-center">
           <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
@@ -325,15 +326,16 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200">
+      <!-- 日付ブロック（左側へ移動） -->
+      <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200 shrink-0">
         <button id="btn-prev-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="前日">◀</button>
         <input id="date-picker" type="date" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-blue-500" />
         <button id="btn-next-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="翌日">▶</button>
         <div class="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black">下校</div>
       </div>
 
-      <!-- ★修正：タブ枠を「全画面」の右側に移動し、上段で一列表示 -->
-      <div class="flex items-center gap-2 flex-nowrap">
+      <!-- ★修正：2行目に回っていた部分を上段（同一行）に固定 -->
+      <div class="flex items-center gap-2 flex-nowrap ml-auto shrink-0">
         <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">☁ 未接続</div>
         <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">👤 未ログイン</div>
         <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black">全画面</button>
