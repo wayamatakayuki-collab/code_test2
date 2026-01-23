@@ -22,8 +22,22 @@
       .print-shell{ max-width:100% !important; width:100% !important; padding:0 !important; margin:0 !important; }
       @page{ size:A4 portrait; margin:7mm; }
 
-      .print-page{ display:block; width:100%; page-break-after:always; }
-      .print-page:last-child{ page-break-after:auto; }
+     /* 印刷ページ：最後だけ改ページしない（空白ページ対策） */
+.print-page{
+  display:block;
+  width:100%;
+  margin:0 !important;
+  page-break-after:always;
+  break-after:page;
+}
+
+/* last-child が効かないケースがあるので last-of-type も併用 */
+#print-content .print-page:last-child,
+#print-content .print-page:last-of-type{
+  page-break-after:auto;
+  break-after:auto;
+}
+
       .print-card{ border:2px solid #000 !important; box-shadow:none !important; }
 
       .print-title{
