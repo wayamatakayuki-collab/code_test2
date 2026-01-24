@@ -316,54 +316,58 @@
     </div>
   </div>
 
-  <!-- ★差し替え済みヘッダー：日付をタイトル左／スマホ・タブレットは2〜3行に折り返しOK -->
+  <!-- ★差し替え：日付とタイトルを入れ替え（左＝日付 / 中央＝タイトル） -->
   <header class="no-print sticky top-0 z-40 bg-white/75 backdrop-blur-md border-b border-slate-200">
-    <div class="max-w-[1400px] mx-auto px-3 py-2">
-      <div class="flex flex-wrap items-center gap-2">
-        <!-- 日付：タイトルの左 -->
-        <div class="shrink-0">
-          <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200">
-            <button id="btn-prev-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="前日">◀</button>
-            <input id="date-picker" type="date" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-blue-500" />
-            <button id="btn-next-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="翌日">▶</button>
-          </div>
+    <div class="max-w-[1400px] mx-auto px-4 py-3
+                flex items-center gap-3 flex-nowrap overflow-x-auto
+                lg:grid lg:grid-cols-[auto_minmax(260px,520px)_minmax(0,1fr)]
+                lg:gap-4 lg:overflow-visible">
+
+      <!-- LEFT：日付（常に左） -->
+      <div class="shrink-0">
+        <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200">
+          <button id="btn-prev-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="前日">◀</button>
+          <input id="date-picker" type="date" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-blue-500" />
+          <button id="btn-next-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="翌日">▶</button>
         </div>
-
-        <!-- タイトル：残り幅を使い、狭いと折り返し -->
-        <div class="flex items-center gap-2 min-w-[220px] flex-1">
-          <div class="w-10 h-10 rounded-2xl bg-blue-600 shadow-lg shadow-blue-100 grid place-items-center shrink-0">
-            <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                d="M4 17V7a2 2 0 0 1 2-2h9.5a2 2 0 0 1 1.4.6L20 8.7a2 2 0 0 1 .6 1.4V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
-              <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M4 10h16"/>
-            </svg>
-          </div>
-
-          <div class="min-w-0 leading-tight">
-            <div class="text-base md:text-lg font-black tracking-tight truncate">
-              大多喜小学校 スクールバス乗車確認
-            </div>
-            <div class="text-[11px] font-bold text-slate-400 truncate">©2026 Takayuki WAYAMA</div>
-          </div>
-        </div>
-
-        <!-- 右：ピル＋全画面（狭いと次行へ） -->
-        <div class="shrink-0 flex items-center gap-2">
-          <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">☁ 未接続</div>
-          <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">👤 未ログイン</div>
-          <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black whitespace-nowrap">全画面</button>
-        </div>
-
-        <!-- タブ：スマホ/タブレットは次の行に落としてOK（横スクロール可） -->
-        <nav class="w-full md:w-auto md:ml-auto">
-          <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap overflow-x-auto">
-            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
-            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
-            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-print" onclick="UI.switchTab('print')">印刷</button>
-            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-settings" onclick="UI.switchTab('settings')">名簿/設定</button>
-          </div>
-        </nav>
       </div>
+
+      <!-- CENTER：タイトル（常に中央） -->
+      <div class="flex items-center gap-2 min-w-0 lg:justify-self-center lg:max-w-[520px]">
+        <div class="w-10 h-10 rounded-2xl bg-blue-600 shadow-lg shadow-blue-100 grid place-items-center shrink-0">
+          <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+              d="M4 17V7a2 2 0 0 1 2-2h9.5a2 2 0 0 1 1.4.6L20 8.7a2 2 0 0 1 .6 1.4V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
+            <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M4 10h16"/>
+          </svg>
+        </div>
+
+        <div class="min-w-0 leading-tight">
+          <div class="text-base md:text-lg font-black tracking-tight truncate">
+            大多喜小学校 スクールバス乗車確認
+          </div>
+          <div class="text-[11px] font-bold text-slate-400 truncate">©2026 Takayuki WAYAMA</div>
+        </div>
+      </div>
+
+      <!-- RIGHT：右ははみ出したらこの領域だけ横スクロール（重なり防止） -->
+      <div class="min-w-0 flex-1 lg:flex-none lg:justify-self-end overflow-x-auto">
+        <div class="flex items-center justify-end gap-2 flex-nowrap min-w-max">
+          <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">☁ 未接続</div>
+          <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500">👤 未ログイン</div>
+          <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black shrink-0">全画面</button>
+
+          <nav class="ml-2 shrink-0">
+            <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap">
+              <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
+              <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
+              <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-print" onclick="UI.switchTab('print')">印刷</button>
+              <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-settings" onclick="UI.switchTab('settings')">名簿/設定</button>
+            </div>
+          </nav>
+        </div>
+      </div>
+
     </div>
   </header>
 
@@ -1230,7 +1234,7 @@ function renderOverview(){
   $("#class-progress-badges").innerHTML = classes.map(c=>{
     const done = classDone[c]===true;
     return `
-      <div class="px-3 py-2 rounded-2xl border text-[11px] font-black ${done ? "bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-100" : "bg-slate-100 border-slate-200 text-slate-500"}">
+      <div class="px-3 py-2 rounded-2xl border text-[11px] font-black ${done ? "bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-100 hover:bg-emerald-600" : "bg-slate-100 border-slate-200 text-slate-500"}">
         ${c} ${done ? "✓" : ""}
       </div>
     `;
@@ -1996,7 +2000,7 @@ function bind(){
 
     const editId=$("#edit-id").value;
     const item={
-      id: editId ? Number(editId) : (Date.now()+Math.floor(Math.random()*10000)),
+      id: editId ? Number(editId) : (Date.now()+Math.floor(Mathrandom()*10000)),
       class: $("#input-class").value.trim(),
       num: Number($("#input-num").value) || 0,
       name: $("#input-name").value.trim(),
