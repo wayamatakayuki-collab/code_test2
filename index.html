@@ -242,62 +242,6 @@
 
     /* ヘッダーのピルが縮んで縦書きになるのを防止（JSでclassが上書きされても効く） */
     #cloud-pill, #auth-pill { white-space: nowrap; flex-shrink: 0; }
-
-    /* =========================
-       ★差し替え：ヘッダーの並び（タイトル左／日付右）
-       - タブレット：1行目（タイトル+日付）／2行目（残り全て）
-       - スマホ縦：  1行目（タイトル）／2行目（日付）／3行目（残り全て）
-       - スマホ横：  1行目（タイトル+日付）／2行目（残り全て）
-       - デスクトップ：1行（タイトル｜残り｜日付）
-    ========================= */
-    #header-grid{ display:grid; gap:.5rem; align-items:center; }
-    #hdr-title{ grid-area:title; min-width:0; }
-    #hdr-date{ grid-area:date; }
-    #hdr-rest{ grid-area:rest; min-width:0; }
-
-    /* スマホ縦（デフォルト：1列3行） */
-    @media (max-width:639px){
-      #header-grid{
-        grid-template-columns: 1fr;
-        grid-template-areas:
-          "title"
-          "date"
-          "rest";
-      }
-      /* スマホ縦は日付を左寄せ（2行目） */
-      #hdr-date{ justify-self:start; }
-    }
-
-    /* スマホ横：1行目（title+date）2行目（rest） */
-    @media (max-width:639px) and (orientation:landscape){
-      #header-grid{
-        grid-template-columns: 1fr auto;
-        grid-template-areas:
-          "title date"
-          "rest  rest";
-      }
-      #hdr-date{ justify-self:end; }
-    }
-
-    /* タブレット：1行目（title+date）2行目（rest） */
-    @media (min-width:640px) and (max-width:1023px){
-      #header-grid{
-        grid-template-columns: 1fr auto;
-        grid-template-areas:
-          "title date"
-          "rest  rest";
-      }
-      #hdr-date{ justify-self:end; }
-    }
-
-    /* デスクトップ：1行（title｜rest｜date） */
-    @media (min-width:1024px){
-      #header-grid{
-        grid-template-columns: minmax(260px,1fr) 1fr auto;
-        grid-template-areas: "title rest date";
-      }
-      #hdr-date{ justify-self:end; }
-    }
   </style>
 
   <!-- Firebase（このJSは window.firebase を使うので必須） -->
@@ -372,12 +316,21 @@
     </div>
   </div>
 
-  <!-- ★差し替え済みヘッダー：タイトル左／日付右（端末別に1〜3行へ制御） -->
+  <!-- ★差し替え済みヘッダー：日付をタイトル左／スマホ・タブレットは2〜3行に折り返しOK -->
   <header class="no-print sticky top-0 z-40 bg-white/75 backdrop-blur-md border-b border-slate-200">
     <div class="max-w-[1400px] mx-auto px-3 py-2">
-      <div id="header-grid">
-        <!-- タイトル（左） -->
-        <div id="hdr-title" class="flex items-center gap-2 min-w-0">
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- 日付：タイトルの左 -->
+        <div class="shrink-0">
+          <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200">
+            <button id="btn-prev-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="前日">◀</button>
+            <input id="date-picker" type="date" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-blue-500" />
+            <button id="btn-next-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="翌日">▶</button>
+          </div>
+        </div>
+
+        <!-- タイトル：残り幅を使い、狭いと折り返し -->
+        <div class="flex items-center gap-2 min-w-[220px] flex-1">
           <div class="w-10 h-10 rounded-2xl bg-blue-600 shadow-lg shadow-blue-100 grid place-items-center shrink-0">
             <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
@@ -394,35 +347,22 @@
           </div>
         </div>
 
-        <!-- 日付（右） -->
-        <div id="hdr-date" class="shrink-0">
-          <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200">
-            <button id="btn-prev-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="前日">◀</button>
-            <input id="date-picker" type="date" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-blue-500" />
-            <button id="btn-next-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="翌日">▶</button>
-          </div>
+        <!-- 右：ピル＋全画面（狭いと次行へ） -->
+        <div class="shrink-0 flex items-center gap-2">
+          <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">☁ 未接続</div>
+          <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">👤 未ログイン</div>
+          <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black whitespace-nowrap">全画面</button>
         </div>
 
-        <!-- 残り全て（ピル＋全画面＋タブ） -->
-        <div id="hdr-rest" class="min-w-0">
-          <div class="flex flex-wrap items-center gap-2">
-            <div class="shrink-0 flex items-center gap-2">
-              <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">☁ 未接続</div>
-              <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">👤 未ログイン</div>
-              <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black whitespace-nowrap">全画面</button>
-            </div>
-
-            <nav class="flex-1 min-w-[240px]">
-              <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap overflow-x-auto">
-                <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
-                <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
-                <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-print" onclick="UI.switchTab('print')">印刷</button>
-                <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-settings" onclick="UI.switchTab('settings')">名簿/設定</button>
-              </div>
-            </nav>
+        <!-- タブ：スマホ/タブレットは次の行に落としてOK（横スクロール可） -->
+        <nav class="w-full md:w-auto md:ml-auto">
+          <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap overflow-x-auto">
+            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
+            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
+            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-print" onclick="UI.switchTab('print')">印刷</button>
+            <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-settings" onclick="UI.switchTab('settings')">名簿/設定</button>
           </div>
-        </div>
-
+        </nav>
       </div>
     </div>
   </header>
