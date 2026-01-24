@@ -1,1 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>先生のためのプロンプト生成アプリ</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { -webkit-tap-highlight-color: transparent; }
+    textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
+    <header class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <div class="text-xl font-black">先生のためのプロンプト生成アプリ</div>
+          <div class="text-xs text-slate-500 mt-1">テンプレを選んで入力 → プロンプトを自動生成 → そのままコピペ</div>
+        </div>
+        <div class="flex gap-2">
+          <button id="btnNew" class="px-3 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold">新規</button>
+          <button id="btnSave" class="px-3 py-2 rounded-xl bg-sky-600 text-white text-sm font-bold">履歴保存</button>
+        </div>
+      </div>
+    </header>
 
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <!-- INPUT -->
+      <section class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="text-base font-black">入力</div>
+          <div class="text-xs text-slate-500">最小入力でOK</div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label class="space-y-1">
+            <div class="text-xs font-bold text-slate-600">テンプレ</div>
+            <select id="tpl" class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-sky-200">
+              <option value="notice">保護者向け連絡（おたより）</option>
+              <option value="newsletter">学級通信（短め）</option>
+              <option value="shoken">所見（観点別／丁寧）</option>
+              <option value="minutes">会議メモ → 議事録（要点整理）</option>
+              <option value="kounaikenshu">校内研修案（目的→流れ→資料）</option>
+              <option value="trouble">トラブル対応文（事実のみ／丁寧）</option>
+            </select>
+          </label>
+
+          <label class="space-y-1">
+            <div class="text-xs font-bold text-slate-600">読み手</div>
+            <select id="aud" class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-sky-200">
+              <option>保護者</option>
+              <option>職員</option>
+              <option>児童</option>
+              <option>地域・外部団体</option>
+            </select>
+          </label>
+
+          <label class="space-y-1">
+            <div class="text-xs font-bold text-slate-600">学年/対象</div>
+            <input id="grade" class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-sky-200" placeholder="例：小3／全校／PTAなど">
+          </label>
+
+          <label class="space-y-1">
+            <div class="text-xs font-bold text-slate-600">トーン</div>
+            <select id="tone" class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-sky-200">
+              <option>丁寧でやさしい</option>
+              <option>事務的で簡潔</option>
+              <option>前向きで明るい</option>
+              <option>厳しめ（ただし丁寧）</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label class="space-y-1">
+            <div class="text-xs font-bold text-slate-600">文字数（目安）</div>
+            <select id="len" class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-sky-200">
+              <option value="200">200字程度</option>
+              <option value="400">400字程度</option>
+              <option value="700">700字程度</option>
+              <option value="1000">1000字程度</option>
+              <option value="none">指定なし</option>
+            </select>
+          </label>
+
+          <label class="space-y-1">
+            <div class="text-xs font-bold text-slate-600">箇条書き</div>
+            <select id="bullets" class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-sky-200">
+              <option value="auto">必要に応じてOK</option>
+              <option value="yes">積極的に使う</option>
+              <option value="no">使わない（文章のみ）</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="space-y-1">
+          <div class="text-xs font-bold text-slate-600">目的（何をしたい？）</div>
+          <input id="goal" class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-sky-200" placeholder="例：持ち物の連絡を分かりやすく／研修の流れを提案して など">
+        </label>
+
+        <label class="space-y-1">
+          <div class="text-xs font-bold text-slate-600">必ず入れる要素（任意）</div>
+          <input id="must" class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-sky-200" placeholder="例：日時、場所、持ち物、締切、連絡先…">
+        </label>
+
+        <label class="space-y-1">
+          <div class="text-xs font-bold text-slate-600">禁止事項（任意）</div>
+          <input id="ban" class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-sky-200" placeholder="例：個人情報／断定表現／感情的表現 など">
+        </label>
+
+        <label class="space-y-1">
+          <div class="text-xs font-bold text-slate-600">素材（元の文章・メモ・箇条書き）</div>
+          <textarea id="src" rows="7" class="w-full rounded-2xl border-slate-200 focus:ring-2 focus:ring-sky-200" placeholder="ここに下書きやメモを貼る"></textarea>
+        </label>
+
+        <div class="flex gap-2">
+          <button id="btnGen" class="flex-1 px-4 py-3 rounded-2xl bg-emerald-600 text-white font-black">プロンプト生成</button>
+          <button id="btnCopy" class="px-4 py-3 rounded-2xl bg-slate-900 text-white font-black">コピー</button>
+        </div>
+
+        <div id="toast" class="hidden text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-2xl p-3"></div>
+      </section>
+
+      <!-- OUTPUT -->
+      <section class="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="text-base font-black">生成されたプロンプト</div>
+          <div class="text-xs text-slate-500">そのまま貼り付けて使える</div>
+        </div>
+        <textarea id="out" rows="20" class="w-full rounded-2xl border-slate-200 focus:ring-2 focus:ring-sky-200" placeholder="ここに生成結果が表示されます"></textarea>
+
+        <div class="border-t border-slate-100 pt-4">
+          <div class="flex items-center justify-between">
+            <div class="text-base font-black">履歴</div>
+            <button id="btnClearHist" class="text-xs font-bold text-rose-600">履歴を全消去</button>
+          </div>
+          <div id="hist" class="mt-2 space-y-2"></div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="text-center text-xs text-slate-500 py-2">
+      端末内保存（localStorage）／共有保存したい場合はFirestore対応に拡張できます
+    </footer>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const toast = (msg) => {
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.remove("hidden");
+    clearTimeout(window.__toastTimer);
+    window.__toastTimer = setTimeout(()=>t.classList.add("hidden"), 1600);
+  };
+
+  const templates = {
+    notice: {
+      role: "あなたは小学校教員です。学校から保護者に向けた連絡文を作成します。",
+      format: "見出し→本文→必要に応じて箇条書き→締めの一文（協力依頼）",
+    },
+    newsletter: {
+      role: "あなたは小学校教員です。学級通信の短い記事を書きます。",
+      format: "導入1段落→出来事/ねらい→家庭への一言",
+    },
+    shoken: {
+      role: "あなたは小学校教員です。所見（観点別）を丁寧な日本語で作成します。",
+      format: "観点ごとに短く（例：学習/生活/協働など）→強み→次の伸びしろ",
+    },
+    minutes: {
+      role: "あなたは学校の会議運営に詳しい事務職員兼教員です。メモから議事録を整えます。",
+      format: "日時/参加→議題→決定事項→担当と期限→次回確認事項",
+    },
+    kounaikenshu: {
+      role: "あなたは校内研修を設計するスクールリーダーです。研修案を作成します。",
+      format: "目的→ゴール（到達）→流れ（時間割）→準備物→想定Q&A",
+    },
+    trouble: {
+      role: "あなたは学校の危機管理に配慮できる教職員です。丁寧で事実ベースの文面を作成します。",
+      format: "事実（いつ/どこで/何が）→対応→お願い→連絡先",
+    },
+  };
+
+  const buildPrompt = () => {
+    const tplKey = $("tpl").value;
+    const aud = $("aud").value;
+    const grade = $("grade").value.trim();
+    const tone = $("tone").value;
+    const len = $("len").value;
+    const bullets = $("bullets").value;
+    const goal = $("goal").value.trim();
+    const must = $("must").value.trim();
+    const ban = $("ban").value.trim();
+    const src = $("src").value.trim();
+
+    const tpl = templates[tplKey];
+
+    const bulletRule =
+      bullets === "yes" ? "箇条書きを積極的に使ってください。" :
+      bullets === "no" ? "箇条書きは使わず、文章のみでまとめてください。" :
+      "必要に応じて箇条書きを使ってください。";
+
+    const lengthRule =
+      len === "none" ? "文字数の指定はありません。" : `文字数は${len}字程度を目安にしてください。`;
+
+    const parts = [];
+    parts.push(tpl.role);
+    parts.push(`読み手は「${aud}」です。${grade ? `対象は「${grade}」。` : ""}`);
+    parts.push(`文体は「${tone}」。${lengthRule}`);
+    parts.push(bulletRule);
+    parts.push(`出力形式：${tpl.format}`);
+    if (goal) parts.push(`目的：${goal}`);
+    if (must) parts.push(`必ず入れる要素：${must}`);
+    if (ban) parts.push(`禁止事項：${ban}`);
+    parts.push("");
+    parts.push("【素材】");
+    parts.push(src ? src : "（素材なし。一般的な状況を想定して作成してください）");
+    parts.push("");
+    parts.push("【追加ルール】");
+    parts.push("・不足情報がある場合は、最初に質問を最大3つだけしてください。");
+    parts.push("・憶測で個人情報や断定的な事実を作らないでください。");
+    parts.push("・読み手が迷わないよう、結論→必要事項→お願い の順で分かりやすく。");
+
+    return parts.join("\n");
+  };
+
+  const key = "promptGenHistoryV1";
+
+  const loadHist = () => {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  };
+
+  const saveHist = (items) => {
+    localStorage.setItem(key, JSON.stringify(items.slice(0, 30))); // 最大30件
+  };
+
+  const renderHist = () => {
+    const items = loadHist();
+    const wrap = $("hist");
+    wrap.innerHTML = "";
+    if (!items.length) {
+      wrap.innerHTML = `<div class="text-xs text-slate-500">履歴はまだありません。</div>`;
+      return;
+    }
+    items.forEach((it, idx) => {
+      const div = document.createElement("div");
+      div.className = "p-3 rounded-2xl border border-slate-100 bg-slate-50";
+      div.innerHTML = `
+        <div class="flex items-center justify-between gap-2">
+          <div class="text-xs font-black text-slate-700 truncate">${it.title}</div>
+          <button class="text-xs font-bold text-sky-600" data-idx="${idx}">呼び出す</button>
+        </div>
+        <div class="text-[11px] text-slate-500 mt-1">${new Date(it.ts).toLocaleString()}</div>
+      `;
+      div.querySelector("button").addEventListener("click", () => {
+        $("out").value = it.prompt;
+        toast("履歴から呼び出しました");
+      });
+      wrap.appendChild(div);
+    });
+  };
+
+  $("btnGen").addEventListener("click", () => {
+    $("out").value = buildPrompt();
+    toast("生成しました");
+  });
+
+  $("btnCopy").addEventListener("click", async () => {
+    const text = $("out").value.trim();
+    if (!text) return toast("コピーする内容がありません");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("コピーしました");
+    } catch {
+      $("out").select();
+      document.execCommand("copy");
+      toast("コピーしました");
+    }
+  });
+
+  $("btnSave").addEventListener("click", () => {
+    const prompt = $("out").value.trim();
+    if (!prompt) return toast("先に生成してください");
+    const tplText = $("tpl").options[$("tpl").selectedIndex].text;
+    const goal = $("goal").value.trim();
+    const title = (goal ? goal : tplText).slice(0, 40);
+    const items = loadHist();
+    items.unshift({ ts: Date.now(), title, prompt });
+    saveHist(items);
+    renderHist();
+    toast("履歴に保存しました");
+  });
+
+  $("btnClearHist").addEventListener("click", () => {
+    localStorage.removeItem(key);
+    renderHist();
+    toast("履歴を消去しました");
+  });
+
+  $("btnNew").addEventListener("click", () => {
+    ["grade","goal","must","ban","src","out"].forEach(id => $(id).value = "");
+    $("tpl").value = "notice";
+    $("aud").value = "保護者";
+    $("tone").value = "丁寧でやさしい";
+    $("len").value = "400";
+    $("bullets").value = "auto";
+    toast("新規にしました");
+  });
+
+  // 初期表示
+  renderHist();
+</script>
+</body>
+</html>
