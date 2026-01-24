@@ -1234,7 +1234,7 @@ function renderOverview(){
   $("#class-progress-badges").innerHTML = classes.map(c=>{
     const done = classDone[c]===true;
     return `
-      <div class="px-3 py-2 rounded-2xl border text-[11px] font-black ${done ? "bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-100 hover:bg-emerald-600" : "bg-slate-100 border-slate-200 text-slate-500"}">
+      <div class="px-3 py-2 rounded-2xl border text-[11px] font-black ${done ? "bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-100" : "bg-slate-100 border-slate-200 text-slate-500"}">
         ${c} ${done ? "✓" : ""}
       </div>
     `;
@@ -2000,7 +2000,7 @@ function bind(){
 
     const editId=$("#edit-id").value;
     const item={
-      id: editId ? Number(editId) : (Date.now()+Math.floor(Mathrandom()*10000)),
+      id: editId ? Number(editId) : (Date.now()+Math.floor(Math.random()*10000)),
       class: $("#input-class").value.trim(),
       num: Number($("#input-num").value) || 0,
       name: $("#input-name").value.trim(),
