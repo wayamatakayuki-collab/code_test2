@@ -242,72 +242,63 @@
     #cloud-pill, #auth-pill { white-space: nowrap; flex-shrink: 0; }
 
     /* =========================
-       ★指示どおり：見出し（ヘッダー）の行レイアウトを端末別に制御
-       ★今回の修正：1行目は「タイトル → 日付」を全端末で統一
-       - PC：1行（title → ... → date）
-       - タブレット：1行目=タイトル+日付 / 2行目=ピル+全画面 + タブ
-       - スマホ縦：1行目=タイトル+日付 / 2行目=ピル+全画面 / 3行目=タブ
-       - スマホ横：1行目=タイトル+日付 / 2行目=ピル+全画面 + タブ
+       ★【指示通りに修正】ヘッダー：1行目は全端末「タイトル → 日付」で統一
+       - 共通：1行目 = title / date（2カラム固定）
+       - 640px以上：2行目 = status / tabs（同じ行）
+       - 639px以下（スマホ縦）：2行目=status、3行目=tabs（見やすさ優先）
+       ※ iPad横(1024px)がlg扱いになって崩れる問題を根絶（lg専用ルールを廃止）
     ========================= */
     .hdr-grid{
       display:grid;
       gap:.5rem;
       align-items:center;
+
+      grid-template-columns: minmax(0,1fr) auto;
+      grid-template-areas:
+        "title date"
+        "status tabs";
     }
     .hdr-title{ grid-area:title; min-width:0; }
-    .hdr-date{ grid-area:date; }
-    .hdr-status{ grid-area:status; }
+    .hdr-date{ grid-area:date; justify-self:end; }
+    .hdr-status{ grid-area:status; min-width:0; }
     .hdr-tabs{ grid-area:tabs; min-width:0; }
 
-    /* PC（lg以上）：1行。※ここを基本形にして「PCは1行」を担保 */
-    @media (min-width: 1024px){
-      .hdr-grid{
-        grid-template-columns: minmax(260px, 1fr) minmax(280px, 1fr) auto auto;
-        grid-template-areas: "title tabs status date";
-      }
-      .hdr-tabs .tabs-wrap{
-        overflow-x:auto;
-        white-space:nowrap;
-      }
+    /* すべての幅でタブは横スクロール可 */
+    .hdr-tabs .tabs-wrap{
+      overflow-x:auto;
+      white-space:nowrap;
     }
 
-    /* タブレット（sm〜lg未満）：2行（1行目：タイトル→日付） */
-    @media (min-width: 640px) and (max-width: 1023px){
-      .hdr-grid{
-        grid-template-columns: 1fr auto;
-        grid-template-areas:
-          "title date"
-          "status tabs";
-      }
-      .hdr-tabs .tabs-wrap{
-        overflow-x:auto;
-        white-space:nowrap;
-      }
-    }
-
-    /* ★スマホ（sm未満）：縦は「1行目：タイトル→日付」に統一して3行 */
+    /* スマホ縦（〜639px）：2行目=status、3行目=tabs（ただし1行目は title→date を維持） */
     @media (max-width: 639px){
       .hdr-grid{
-        grid-template-columns: 1fr auto;
+        grid-template-columns: minmax(0,1fr) auto;
         grid-template-areas:
           "title date"
           "status status"
           "tabs tabs";
       }
-      .hdr-tabs .tabs-wrap{
-        overflow-x:auto;
-        white-space:nowrap;
+
+      /* 日付UIを詰めて「1行目に収める」 */
+      #date-picker{
+        font-size: 12px;
+        padding: .45rem .55rem;
+        width: 8.6rem;
+      }
+      #btn-prev-day, #btn-next-day{
+        padding: .45rem .55rem;
+      }
+      .hdr-date > div{
+        padding: .4rem;
+        gap: .35rem;
+        flex-wrap: nowrap;
       }
     }
 
-    /* スマホ横（sm未満 + landscape）：2行（1=タイトル+日付 / 2=ピル+全画面+タブ） */
-    @media (max-width: 639px) and (orientation: landscape){
-      .hdr-grid{
-        grid-template-columns: 1fr auto;
-        grid-template-areas:
-          "title date"
-          "status tabs";
-      }
+    /* さらに狭い端末（〜380px）での保険 */
+    @media (max-width: 380px){
+      #date-picker{ width: 7.4rem; }
+      #btn-prev-day, #btn-next-day{ padding: .4rem .5rem; }
     }
   </style>
 
@@ -383,7 +374,7 @@
     </div>
   </div>
 
-  <!-- ★指示どおり：ヘッダー（1行目：タイトル→日付 を全端末で統一） -->
+  <!-- ★指示どおり：ヘッダー（1行目=タイトル→日付 を全端末統一） -->
   <header class="no-print sticky top-0 z-40 bg-white/75 backdrop-blur-md border-b border-slate-200">
     <div class="max-w-[1400px] mx-auto px-3 py-2">
       <div class="hdr-grid">
@@ -437,6 +428,10 @@
       </div>
     </div>
   </header>
+
+  <!-- ここから下（JS含む）は、あなたの貼付コードを一切変更していません -->
+  <!-- ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓ -->
+  <!-- （長いので省略せずに“そのまま”貼り続けます） -->
 
   <main id="main-shell" class="print-shell max-w-[1400px] mx-auto px-4 py-6 space-y-6">
     <!-- Overview -->
