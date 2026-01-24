@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>PromptHub（Local Pro）</title>
+  <title>PromptHub（全部入り / Local MAX）</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -29,7 +29,7 @@
 <body class="bg-slate-50">
   <div id="root"></div>
 
-  <!-- 画面真っ白対策：エラーを可視化 -->
+  <!-- 画面真っ白対策：エラー可視化 -->
   <script>
     window.addEventListener("error", (e) => {
       const el = document.getElementById("root");
@@ -50,9 +50,9 @@
     const { useEffect, useMemo, useRef, useState } = React;
 
     // =========================
-    // Storage Keys
+    // Storage Key
     // =========================
-    const LS_KEY = "prompthub_local_pro_v2";
+    const LS_KEY = "prompthub_local_max_v2";
 
     // =========================
     // Utils
@@ -67,7 +67,7 @@
         .split(/[,、\n]/)
         .map(s => s.trim())
         .filter(Boolean)
-        .slice(0, 32);
+        .slice(0, 80);
       return dedupe(arr);
     };
 
@@ -111,49 +111,41 @@
         .toLowerCase();
     };
 
-    // --- Simple Japanese-ish stopwords for tag extraction
+    // --- stopwords for tag extraction (simple)
     const STOP = new Set([
       "これ","それ","あれ","どれ","ため","など","もの","こと","する","した","して","します","です","ます","ある","いる","そして","また","さらに",
-      "について","から","まで","より","ので","ので","ので","として","よう","ので","この","その","あの","どの","ここ","そこ","あそこ",
+      "について","から","まで","より","ので","として","よう","この","その","あの","どの","ここ","そこ","あそこ",
       "今回","本日","先日","明日","昨日","今日","場合","必要","可能","確認","対応","作成","追加","削除","保存","検索","内容","入力","出力",
-      "お願い","ください","します","します","できます","できる","です","ます","です","ます","など","等","的","的に","的な"
+      "お願い","ください","できます","できる","等","的","的に","的な"
     ]);
 
     // =========================
-    // Auto Tag Suggestion (from title/content)
+    // Auto Tag Suggestion
     // =========================
     const extractTagCandidates = (title, content) => {
       const text = `${title || ""}\n${content || ""}`.replace(/\s+/g, " ");
       const candidates = new Map();
 
-      // hashtags first
+      // hashtags
       const h = text.matchAll(/#([^\s#]{1,24})/g);
       for (const m of h) {
         const tag = (m[1] || "").trim();
         if (tag) candidates.set(tag, (candidates.get(tag) || 0) + 4);
       }
 
-      // token patterns: Kanji, Katakana, Latin/Number, mixed
+      // tokens
       const tokens = text.match(/[一-龥]{2,}|[ァ-ヶー]{2,}|[A-Za-z0-9]{2,}|[一-龥ァ-ヶーA-Za-z0-9]{3,}/g) || [];
       for (let t of tokens) {
         t = t.trim();
         if (!t) continue;
         if (t.length > 18) continue;
         if (STOP.has(t)) continue;
-
-        // ignore too-hiragana-ish tokens (heuristic)
-        const hiraganaOnly = /^[ぁ-んー]+$/.test(t);
-        if (hiraganaOnly) continue;
-
-        // de-noise common fragments
         if (/^http/.test(t)) continue;
         if (/^\d{2,}$/.test(t)) continue;
-
-        const base = t;
-        candidates.set(base, (candidates.get(base) || 0) + 1);
+        if (/^[ぁ-んー]+$/.test(t)) continue;
+        candidates.set(t, (candidates.get(t) || 0) + 1);
       }
 
-      // scoring: prefer tokens with Kanji/Katakana
       const scored = Array.from(candidates.entries()).map(([tag, score]) => {
         const hasKanji = /[一-龥]/.test(tag);
         const hasKata = /[ァ-ヶー]/.test(tag);
@@ -163,13 +155,13 @@
       });
 
       scored.sort((a,b)=> b.score - a.score);
-      return scored.map(x=>x.tag).filter(t=> !STOP.has(t)).slice(0, 16);
+      return scored.map(x=>x.tag).filter(t=> !STOP.has(t)).slice(0, 24);
     };
 
     // =========================
     // Similarity Detection (char 3-gram Jaccard)
     // =========================
-    const ngrams = (s, n=3, limit=1200) => {
+    const ngrams = (s, n=3, limit=1400) => {
       const t = normalizeText(s);
       const set = new Set();
       if (!t) return set;
@@ -184,7 +176,6 @@
     const jaccard = (A, B) => {
       if (!A.size || !B.size) return 0;
       let inter = 0;
-      // iterate smaller
       const small = A.size < B.size ? A : B;
       const big = A.size < B.size ? B : A;
       for (const x of small) if (big.has(x)) inter++;
@@ -207,7 +198,7 @@
     };
 
     // =========================
-    // Default Templates (with form schema)
+    // Form Schema
     // =========================
     const FIELD_META = {
       keyword:     { label:"キーワード", type:"text", placeholder:"例：魅力的なSNS投稿" },
@@ -222,14 +213,15 @@
       source:      { label:"素材", type:"textarea", placeholder:"下書きやメモを貼る（任意）" }
     };
 
+    // =========================
+    // Default Templates
+    // =========================
     const DEFAULT_TEMPLATES = [
       {
         id: "tpl_structured",
         name: "万能（System + User）",
         desc: "何でも使える構造化テンプレ。",
         system: "あなたはプロンプトエンジニアリングのエキスパートです。目的に最短で到達するためのプロンプトを作成してください。",
-        // user pattern is now mainly built via form (still available for legacy)
-        user: "キーワード: {{keyword}}\n目的: {{goal}}\n条件: {{constraints}}\n出力形式: {{format}}\n注意: {{notes}}",
         form: {
           enabledKeys: ["keyword","goal","constraints","format","notes","source"],
           order: ["keyword","audience","goal","constraints","format","must","ban","length","notes","source"]
@@ -240,7 +232,6 @@
         name: "学校向け文書（保護者/職員）",
         desc: "連絡文・おたより・通知の強い型。",
         system: "あなたは小学校教員です。読み手に誤解が生まれない、丁寧で分かりやすい文面を作成してください。",
-        user: "テーマ: {{keyword}}\n読み手: {{audience}}\n目的: {{goal}}\n必ず入れる項目: {{must}}\n避けたい表現/禁止: {{ban}}\n文字数目安: {{length}}\n素材: {{source}}",
         form: {
           enabledKeys: ["keyword","audience","goal","must","ban","length","source"],
           order: ["keyword","audience","goal","must","ban","length","constraints","format","notes","source"]
@@ -251,7 +242,6 @@
         name: "会議メモ→議事録",
         desc: "決定事項・担当・期限が残る。",
         system: "あなたは学校運営の会議を要点整理する専門家です。抜け漏れなく議事録に整えてください。",
-        user: "議題: {{keyword}}\n素材メモ: {{source}}\n出力：日時/参加者（不明なら空欄）→議題→決定事項→担当/期限→次回確認",
         form: {
           enabledKeys: ["keyword","source","format","notes"],
           order: ["keyword","audience","source","format","notes","constraints","must","ban","length","goal"]
@@ -260,7 +250,7 @@
     ];
 
     // =========================
-    // Form Builder → Prompt Builder
+    // Form Builder → Prompt Builder (local)
     // =========================
     const buildUserPromptFromForm = ({ template, fields, enabledKeys }) => {
       const order = template?.form?.order || Object.keys(FIELD_META);
@@ -270,12 +260,10 @@
         if (!enabled.has(key)) continue;
         const meta = FIELD_META[key];
         const v = (fields?.[key] || "").toString().trim();
-        if (!v) continue; // empty skip
-        // "keyword" label special
+        if (!v) continue;
         const label = meta?.label || key;
         lines.push(`${label}: ${v}`);
       }
-      // fallback
       if (!lines.length) {
         const kw = (fields?.keyword || "").trim();
         if (kw) lines.push(`キーワード: ${kw}`);
@@ -286,7 +274,6 @@
     const localGenerate = ({ template, fields, enabledKeys }) => {
       const sys = (template?.system || DEFAULT_TEMPLATES[0].system).trim();
       const usr = buildUserPromptFromForm({ template, fields, enabledKeys }).trim();
-
       return [
         "【System Instruction】",
         sys,
@@ -301,7 +288,7 @@
     };
 
     // =========================
-    // Load/Save
+    // Load / Save
     // =========================
     const loadState = () => {
       try {
@@ -312,35 +299,44 @@
         return null;
       }
     };
-
     const saveState = (s) => localStorage.setItem(LS_KEY, JSON.stringify(s));
 
     const initialState = () => {
       const s = loadState();
       if (s) {
-        if (!s.personal) s.personal = { folders: [], prompts: [] };
-        if (!s.shared) s.shared = { folders: [], prompts: [] };
+        if (!s.personal) s.personal = { folders: [], prompts: [], trash: [] };
+        if (!s.shared) s.shared = { folders: [], prompts: [], trash: [] };
         if (!Array.isArray(s.templates) || s.templates.length === 0) s.templates = DEFAULT_TEMPLATES;
+
         if (!s.settings) s.settings = {};
         if (!Array.isArray(s.settings.pinnedTags)) s.settings.pinnedTags = ["保護者","職員","学級通信","研修","危機管理","ICT","通知文"];
         if (!s.settings.genProvider) s.settings.genProvider = "local";
         if (!s.settings.geminiKey) s.settings.geminiKey = "";
         if (!s.settings.geminiModel) s.settings.geminiModel = "gemini-2.5-flash";
         if (!s.settings.similarityThreshold) s.settings.similarityThreshold = 0.72;
-        if (!s.settings.formEnabledByTpl) s.settings.formEnabledByTpl = {}; // {tplId: [keys]}
+        if (!s.settings.formEnabledByTpl) s.settings.formEnabledByTpl = {};
+        if (typeof s.settings.enableAutoTagOnSave !== "boolean") s.settings.enableAutoTagOnSave = false;
+        if (!s.settings.maxVersions) s.settings.maxVersions = 30;
+
+        // history store
+        if (!s.history) s.history = { personal: {}, shared: {} };
+
         return s;
       }
       return {
-        personal: { folders: [], prompts: [] },
-        shared: { folders: [], prompts: [] },
+        personal: { folders: [], prompts: [], trash: [] },
+        shared: { folders: [], prompts: [], trash: [] },
         templates: DEFAULT_TEMPLATES,
+        history: { personal: {}, shared: {} },
         settings: {
           pinnedTags: ["保護者","職員","学級通信","研修","危機管理","ICT","通知文"],
           genProvider: "local",
           geminiKey: "",
           geminiModel: "gemini-2.5-flash",
           similarityThreshold: 0.72,
-          formEnabledByTpl: {}
+          formEnabledByTpl: {},
+          enableAutoTagOnSave: false,
+          maxVersions: 30
         }
       };
     };
@@ -353,14 +349,14 @@
       return (
         <div className="fixed inset-0 z-[90]">
           <div className="absolute inset-0 bg-black/30" onClick={onClose}></div>
-          <div className="absolute inset-x-0 top-6 mx-auto max-w-3xl px-4">
+          <div className="absolute inset-x-0 top-6 mx-auto max-w-5xl px-4">
             <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
               <div className="p-5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {icon}
                   <div className="font-black text-slate-800">{title}</div>
                 </div>
-                <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100">
+                <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100" title="閉じる">
                   <Ico name="x" size={18} className="text-slate-600" />
                 </button>
               </div>
@@ -392,12 +388,19 @@
       const [searchQuery, setSearchQuery] = useState("");
       const [starOnly, setStarOnly] = useState(false);
 
-      const [showToast, setShowToast] = useState(null);
+      const [tagFilter, setTagFilter] = useState("");
+      const [showTrash, setShowTrash] = useState(false);
 
       const [tagsInput, setTagsInput] = useState("");
-      const [templateId, setTemplateId] = useState(state.templates?.[0]?.id || DEFAULT_TEMPLATES[0].id);
+      const [templateId, setTemplateId] = useState((state.templates?.[0]?.id) || DEFAULT_TEMPLATES[0].id);
 
-      // Form fields (includes keyword field for template-form)
+      // bulk mode
+      const [bulkMode, setBulkMode] = useState(false);
+      const [selectedIds, setSelectedIds] = useState(new Set());
+      const [bulkTagInput, setBulkTagInput] = useState("");
+      const [bulkFolderId, setBulkFolderId] = useState("");
+
+      // form fields
       const [formFields, setFormFields] = useState({
         keyword: "",
         audience: "保護者",
@@ -411,22 +414,25 @@
         source: ""
       });
 
-      // Enabled keys per template (フォーム化: 項目のON/OFF)
-      const enabledKeys = useMemo(() => {
-        const tplMap = state.settings?.formEnabledByTpl || {};
-        const tpl = (state.templates || DEFAULT_TEMPLATES).find(t => t.id === templateId) || DEFAULT_TEMPLATES[0];
-        return tplMap[templateId] || tpl?.form?.enabledKeys || ["keyword","goal","constraints","format","notes","source"];
-      }, [state.settings?.formEnabledByTpl, templateId, state.templates]);
-
       // modals
       const [settingsOpen, setSettingsOpen] = useState(false);
       const [templatesOpen, setTemplatesOpen] = useState(false);
       const [backupOpen, setBackupOpen] = useState(false);
+      const [tagsOpen, setTagsOpen] = useState(false);
+      const [foldersOpen, setFoldersOpen] = useState(false);
+      const [commandOpen, setCommandOpen] = useState(false);
+      const [versionsOpen, setVersionsOpen] = useState(false);
 
       // similarity modal
       const [similarOpen, setSimilarOpen] = useState(false);
       const [similarMatches, setSimilarMatches] = useState([]);
       const [pendingSave, setPendingSave] = useState(null);
+
+      // toast (with action)
+      const [toastObj, setToastObj] = useState(null); // {msg, actionLabel, onAction}
+      const toastTimer = useRef(null);
+
+      const searchRef = useRef(null);
 
       // persist
       useEffect(() => {
@@ -434,28 +440,39 @@
         return () => clearTimeout(t);
       }, [state]);
 
-      // sync tags input when select
+      // switch library
       useEffect(() => {
-        if (!selectedPrompt) return;
-        setTagsInput((selectedPrompt.tags || []).join(", "));
-        // also prefill form keyword from title if empty
-        setFormFields(prev => ({
-          ...prev,
-          keyword: prev.keyword || (selectedPrompt.title || "").replace(/のプロンプト$/,"").trim(),
-        }));
-      }, [selectedPrompt?.id]);
+        setActiveFolderId("all");
+        setSelectedPrompt(null);
+        setTagsInput("");
+        setTagFilter("");
+        setShowTrash(false);
+        setBulkMode(false);
+        setSelectedIds(new Set());
+      }, [libraryMode]);
 
-      const toast = (msg) => {
-        setShowToast(msg);
-        setTimeout(() => setShowToast(null), 2400);
+      const toast = (msg, actionLabel=null, onAction=null) => {
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        setToastObj({ msg, actionLabel, onAction });
+        toastTimer.current = setTimeout(() => setToastObj(null), 2800);
       };
 
       const folders = lib.folders || [];
       const prompts = lib.prompts || [];
+      const trash = lib.trash || [];
       const templates = state.templates || DEFAULT_TEMPLATES;
 
-      // tag chips base (fixed + frequent)
+      const enabledKeys = useMemo(() => {
+        const tplMap = state.settings?.formEnabledByTpl || {};
+        const tpl = templates.find(t => t.id === templateId) || DEFAULT_TEMPLATES[0];
+        return tplMap[templateId] || tpl?.form?.enabledKeys || ["keyword","goal","constraints","format","notes","source"];
+      }, [state.settings?.formEnabledByTpl, templateId, templates]);
+
+      const template = templates.find(t => t.id === templateId) || templates[0];
+
       const pinnedTags = state.settings?.pinnedTags || [];
+
+      // tag stats for current view list (prompts only)
       const tagStats = useMemo(() => {
         const map = new Map();
         prompts.forEach(p => (p.tags||[]).forEach(t => map.set(t, (map.get(t)||0)+1)));
@@ -464,33 +481,43 @@
 
       const tagSuggestions = useMemo(() => {
         const top = tagStats.slice(0, 18).map(x => x.tag);
-        return dedupe([...pinnedTags, ...top]).slice(0, 24);
+        return dedupe([...pinnedTags, ...top]).slice(0, 30);
       }, [pinnedTags, tagStats]);
 
-      // auto tags from content/title
       const autoTags = useMemo(() => {
         if (!selectedPrompt) return [];
-        const t = selectedPrompt.title || "";
-        const c = selectedPrompt.content || "";
-        return extractTagCandidates(t, c);
+        return extractTagCandidates(selectedPrompt.title || "", selectedPrompt.content || "");
       }, [selectedPrompt?.title, selectedPrompt?.content]);
 
-      // filtering
-      const filteredPrompts = useMemo(() => {
+      // list source: prompts or trash
+      const listSource = showTrash ? trash : prompts;
+
+      const filteredList = useMemo(() => {
         const q = safeLower(searchQuery.trim());
-        return prompts.filter(p => {
-          const folderOk = activeFolderId === "all" || p.folderId === activeFolderId;
-          if (!folderOk) return false;
-          if (starOnly && !p.starred) return false;
+        const tf = safeLower(tagFilter.trim());
+
+        return (listSource || []).filter(p => {
+          // folder filter applies only in prompts view (not trash)
+          if (!showTrash) {
+            const folderOk = activeFolderId === "all" || p.folderId === activeFolderId;
+            if (!folderOk) return false;
+            if (starOnly && !p.starred) return false;
+
+            if (tf) {
+              const hasTag = (p.tags||[]).some(t => safeLower(t) === tf);
+              if (!hasTag) return false;
+            }
+          }
+
           if (!q) return true;
           const title = safeLower(p.title);
           const content = safeLower(p.content);
           const tags = (p.tags||[]).map(safeLower).join(" ");
           return title.includes(q) || content.includes(q) || tags.includes(q);
         }).sort((a,b) => (b.updatedAt || b.createdAt || "").localeCompare(a.updatedAt || a.createdAt || ""));
-      }, [prompts, activeFolderId, searchQuery, starOnly]);
+      }, [listSource, activeFolderId, searchQuery, starOnly, tagFilter, showTrash]);
 
-      // ===== Actions =====
+      // ===== internal helpers =====
       const setLib = (nextLib) => {
         setState(prev => {
           const out = { ...prev };
@@ -500,12 +527,69 @@
         });
       };
 
+      const getOtherLib = () => (libraryMode === "personal" ? state.shared : state.personal);
+
+      const setOtherLib = (next) => {
+        setState(prev => {
+          const out = { ...prev };
+          if (libraryMode === "personal") out.shared = next;
+          else out.personal = next;
+          return out;
+        });
+      };
+
+      const historyStore = (libraryMode === "personal" ? (state.history?.personal || {}) : (state.history?.shared || {}));
+
+      const pushVersion = (promptId, snapshot) => {
+        const maxV = Number(state.settings?.maxVersions ?? 30);
+        setState(prev => {
+          const out = { ...prev };
+          if (!out.history) out.history = { personal:{}, shared:{} };
+          const key = (libraryMode === "personal") ? "personal" : "shared";
+          const current = out.history[key] || {};
+          const arr = (current[promptId] || []);
+          const next = [snapshot, ...arr].slice(0, maxV);
+          out.history = {
+            ...out.history,
+            [key]: { ...current, [promptId]: next }
+          };
+          return out;
+        });
+      };
+
+      const getVersions = (promptId) => {
+        const arr = historyStore?.[promptId] || [];
+        return Array.isArray(arr) ? arr : [];
+      };
+
+      // ===== Actions =====
       const createFolder = () => {
         const name = prompt("新しいフォルダ名を入力してください:");
         if (!name || !name.trim()) return;
         const next = [...folders, { id: uid("f"), name: name.trim(), createdAt: nowISO() }];
         setLib({ ...lib, folders: next });
         toast("フォルダ作成");
+      };
+
+      const renameFolder = (folderId) => {
+        const f = folders.find(x => x.id === folderId);
+        if (!f) return;
+        const name = prompt("フォルダ名を変更:", f.name || "");
+        if (!name || !name.trim()) return;
+        const nextFolders = folders.map(x => x.id === folderId ? { ...x, name: name.trim() } : x);
+        setLib({ ...lib, folders: nextFolders });
+        toast("フォルダ名を変更");
+      };
+
+      const deleteFolder = (folderId) => {
+        const f = folders.find(x => x.id === folderId);
+        if (!f) return;
+        if (!confirm(`フォルダ「${f.name}」を削除しますか？\n※フォルダ内のプロンプトは「フォルダなし」に移動します。`)) return;
+        const nextFolders = folders.filter(x => x.id !== folderId);
+        const nextPrompts = prompts.map(p => p.folderId === folderId ? { ...p, folderId: "" } : p);
+        setLib({ ...lib, folders: nextFolders, prompts: nextPrompts });
+        if (activeFolderId === folderId) setActiveFolderId("all");
+        toast("フォルダ削除");
       };
 
       const createNewPrompt = () => {
@@ -525,18 +609,76 @@
         setFormFields(prev => ({ ...prev, keyword:"", source:"" }));
       };
 
-      const deletePrompt = (id) => {
-        if (!confirm("このプロンプトを削除しますか？")) return;
-        const nextPrompts = prompts.filter(p => p.id !== id);
-        setLib({ ...lib, prompts: nextPrompts });
+      const openPrompt = (p) => {
+        setSelectedPrompt(p);
+        setTagsInput((p.tags||[]).join(", "));
+      };
+
+      const softDeletePrompt = (id) => {
+        // from prompts -> trash
+        const p = prompts.find(x => x.id === id);
+        if (!p) return;
+        const nextPrompts = prompts.filter(x => x.id !== id);
+        const t = { ...p, deletedAt: nowISO() };
+        const nextTrash = [t, ...trash].slice(0, 5000);
+        setLib({ ...lib, prompts: nextPrompts, trash: nextTrash });
         if (selectedPrompt?.id === id) setSelectedPrompt(null);
-        toast("削除しました");
+        toast("ゴミ箱に移動しました", "元に戻す", () => restoreFromTrash(id));
+      };
+
+      const restoreFromTrash = (id) => {
+        const p = trash.find(x => x.id === id);
+        if (!p) return;
+        const nextTrash = trash.filter(x => x.id !== id);
+        const restored = { ...p };
+        delete restored.deletedAt;
+        restored.updatedAt = nowISO();
+        const nextPrompts = [restored, ...prompts];
+        setLib({ ...lib, prompts: nextPrompts, trash: nextTrash });
+        toast("復元しました");
+      };
+
+      const purgeFromTrash = (id) => {
+        const p = trash.find(x => x.id === id);
+        if (!p) return;
+        if (!confirm("完全に削除しますか？（戻せません）")) return;
+        const nextTrash = trash.filter(x => x.id !== id);
+        setLib({ ...lib, trash: nextTrash });
+        toast("完全削除しました");
       };
 
       const toggleStar = (id) => {
         const next = prompts.map(p => p.id === id ? { ...p, starred: !p.starred, updatedAt: nowISO() } : p);
         setLib({ ...lib, prompts: next });
         if (selectedPrompt?.id === id) setSelectedPrompt(next.find(x => x.id === id));
+      };
+
+      const duplicatePrompt = () => {
+        if (!selectedPrompt) return;
+        const clone = {
+          ...selectedPrompt,
+          id: uid("p"),
+          title: (selectedPrompt.title || "無題") + "（複製）",
+          createdAt: nowISO(),
+          updatedAt: nowISO()
+        };
+        setSelectedPrompt(clone);
+        setTagsInput((clone.tags || []).join(", "));
+        toast("複製を作成");
+      };
+
+      const copyToOtherLibrary = () => {
+        if (!selectedPrompt) return;
+        const other = getOtherLib();
+        const clone = {
+          ...selectedPrompt,
+          id: uid("p"),
+          createdAt: nowISO(),
+          updatedAt: nowISO()
+        };
+        const next = { ...other, prompts: [clone, ...(other.prompts||[])] };
+        setOtherLib(next);
+        toast(libraryMode === "personal" ? "共有庫にコピーしました" : "個人庫にコピーしました");
       };
 
       const addTagChip = (tag) => {
@@ -550,15 +692,22 @@
         setTagsInput(curr.filter(t => t !== tag).join(", "));
       };
 
+      const applyAutoTagsToInput = () => {
+        const curr = normalizeTags(tagsInput);
+        const next = dedupe([...curr, ...autoTags]).slice(0, 80);
+        setTagsInput(next.join(", "));
+        toast("自動提案を追加");
+      };
+
       // ===== Similarity detection on save =====
       const detectSimilar = (payload) => {
         const baseText = `${payload.title || ""}\n${payload.content || ""}`;
-        const A = ngrams(baseText, 3, 1200);
+        const A = ngrams(baseText, 3, 1400);
         const matches = [];
         for (const p of prompts) {
           if (p.id === payload.id) continue;
           const txt = `${p.title || ""}\n${p.content || ""}`;
-          const B = ngrams(txt, 3, 1200);
+          const B = ngrams(txt, 3, 1400);
           const sim = jaccard(A, B);
           matches.push({ id: p.id, title: p.title || "無題のプロンプト", sim });
         }
@@ -569,9 +718,30 @@
 
       const commitSave = (payload) => {
         const exists = prompts.some(p => p.id === payload.id);
+
+        if (exists) {
+          const before = prompts.find(p => p.id === payload.id);
+          // push version only when changed
+          const changed = (before?.title !== payload.title) || (before?.content !== payload.content) ||
+                          JSON.stringify(before?.tags||[]) !== JSON.stringify(payload.tags||[]) ||
+                          before?.folderId !== payload.folderId;
+          if (changed && before) {
+            pushVersion(payload.id, {
+              vid: uid("v"),
+              savedAt: nowISO(),
+              title: before.title || "",
+              content: before.content || "",
+              tags: before.tags || [],
+              folderId: before.folderId || "",
+              starred: !!before.starred
+            });
+          }
+        }
+
         const nextPrompts = exists
           ? prompts.map(p => p.id === payload.id ? payload : p)
           : [payload, ...prompts];
+
         setLib({ ...lib, prompts: nextPrompts });
         setSelectedPrompt(payload);
         toast("保存しました");
@@ -579,7 +749,12 @@
 
       const saveCurrentPrompt = (force=false) => {
         if (!selectedPrompt) return;
-        const tags = normalizeTags(tagsInput);
+        let tags = normalizeTags(tagsInput);
+
+        if (state.settings?.enableAutoTagOnSave) {
+          tags = dedupe([...tags, ...extractTagCandidates(selectedPrompt.title || "", selectedPrompt.content || "")]).slice(0, 80);
+        }
+
         const payload = { ...selectedPrompt, tags, updatedAt: nowISO() };
 
         if (!force) {
@@ -594,9 +769,119 @@
         commitSave(payload);
       };
 
-      // ===== Generator / Builder =====
-      const template = templates.find(t => t.id === templateId) || templates[0];
+      // ===== Bulk (multi-select) =====
+      const toggleSelect = (id) => {
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return next;
+        });
+      };
 
+      const clearSelection = () => setSelectedIds(new Set());
+
+      const selectAllFiltered = () => {
+        const ids = new Set(filteredList.map(x => x.id));
+        setSelectedIds(ids);
+      };
+
+      const bulkApplyTags = () => {
+        const add = normalizeTags(bulkTagInput);
+        if (!add.length) return;
+        if (showTrash) {
+          // tags in trash are allowed but usually not needed; still apply
+          const nextTrash = trash.map(p => selectedIds.has(p.id) ? ({...p, tags: dedupe([...(p.tags||[]), ...add]).slice(0,80) }) : p);
+          setLib({ ...lib, trash: nextTrash });
+          toast("（ゴミ箱）タグ一括付与");
+          return;
+        }
+        const nextPrompts = prompts.map(p => {
+          if (!selectedIds.has(p.id)) return p;
+          const nextTags = dedupe([...(p.tags||[]), ...add]).slice(0,80);
+          return { ...p, tags: nextTags, updatedAt: nowISO() };
+        });
+        setLib({ ...lib, prompts: nextPrompts });
+        toast("タグを一括付与");
+      };
+
+      const bulkMoveFolder = () => {
+        if (showTrash) return;
+        const fid = bulkFolderId;
+        const nextPrompts = prompts.map(p => selectedIds.has(p.id) ? ({...p, folderId: fid || "", updatedAt: nowISO() }) : p);
+        setLib({ ...lib, prompts: nextPrompts });
+        toast("フォルダを一括変更");
+      };
+
+      const bulkStar = (on) => {
+        if (showTrash) return;
+        const nextPrompts = prompts.map(p => selectedIds.has(p.id) ? ({...p, starred: !!on, updatedAt: nowISO()}) : p);
+        setLib({ ...lib, prompts: nextPrompts });
+        toast(on ? "スターを一括ON" : "スターを一括OFF");
+      };
+
+      const bulkDelete = () => {
+        if (selectedIds.size === 0) return;
+
+        if (showTrash) {
+          if (!confirm("選択した項目を完全削除しますか？（戻せません）")) return;
+          const nextTrash = trash.filter(p => !selectedIds.has(p.id));
+          setLib({ ...lib, trash: nextTrash });
+          clearSelection();
+          toast("完全削除しました");
+          return;
+        }
+
+        if (!confirm("選択したプロンプトをゴミ箱へ移動しますか？")) return;
+        const moving = prompts.filter(p => selectedIds.has(p.id)).map(p => ({...p, deletedAt: nowISO()}));
+        const nextPrompts = prompts.filter(p => !selectedIds.has(p.id));
+        const nextTrash = [...moving, ...trash].slice(0, 5000);
+        setLib({ ...lib, prompts: nextPrompts, trash: nextTrash });
+        if (selectedPrompt && selectedIds.has(selectedPrompt.id)) setSelectedPrompt(null);
+        clearSelection();
+        toast("ゴミ箱に移動しました");
+      };
+
+      const bulkRestore = () => {
+        if (!showTrash) return;
+        const moving = trash.filter(p => selectedIds.has(p.id)).map(p => {
+          const r = { ...p };
+          delete r.deletedAt;
+          r.updatedAt = nowISO();
+          return r;
+        });
+        const nextTrash = trash.filter(p => !selectedIds.has(p.id));
+        const nextPrompts = [...moving, ...prompts];
+        setLib({ ...lib, prompts: nextPrompts, trash: nextTrash });
+        clearSelection();
+        toast("復元しました");
+      };
+
+      const bulkCopyToOtherLibrary = () => {
+        const ids = Array.from(selectedIds);
+        if (!ids.length) return;
+
+        const src = showTrash ? trash : prompts;
+        const picks = src.filter(p => selectedIds.has(p.id)).map(p => ({ ...p }));
+
+        const other = getOtherLib();
+        const clones = picks.map(p => {
+          const c = { ...p, id: uid("p"), createdAt: nowISO(), updatedAt: nowISO() };
+          return c;
+        });
+        const next = { ...other, prompts: [...clones, ...(other.prompts||[])] };
+        setOtherLib(next);
+        toast(libraryMode === "personal" ? "（一括）共有庫にコピー" : "（一括）個人庫にコピー");
+      };
+
+      const bulkExportJSON = () => {
+        const src = showTrash ? trash : prompts;
+        const picks = src.filter(p => selectedIds.has(p.id));
+        downloadText(`PromptHub_Selected_${showTrash ? "Trash" : libraryMode}_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(picks, null, 2));
+        toast("選択分を書き出し");
+      };
+
+      // ===== Generator =====
       const setEnabledKeysForTpl = (nextKeys) => {
         setState(prev => ({
           ...prev,
@@ -618,7 +903,6 @@
 
       const buildFromFormIntoEditor = () => {
         const txt = localGenerate({ template, fields: formFields, enabledKeys });
-        // If title empty, set a decent title
         const kw = (formFields.keyword || keyword || "").trim();
         setSelectedPrompt(prev => {
           const p = prev || {
@@ -637,17 +921,16 @@
             content: txt
           };
         });
-        toast("フォームで組み立てました");
+        toast("フォームで組み立て");
       };
 
       const generatePrompt = async () => {
         const kw = keyword.trim();
         if (!kw) return;
 
-        // sync form keyword
         setFormFields(prev => ({ ...prev, keyword: prev.keyword || kw }));
-
         setIsGenerating(true);
+
         try {
           let generatedText = "";
 
@@ -661,12 +944,8 @@
             const key = (state.settings?.geminiKey || "").trim();
             const model = (state.settings?.geminiModel || "gemini-2.5-flash").trim();
             if (!key) {
-              generatedText = localGenerate({
-                template,
-                fields: { ...formFields, keyword: kw },
-                enabledKeys
-              });
-              toast("Geminiキー未設定のためローカル生成に切替");
+              generatedText = localGenerate({ template, fields: { ...formFields, keyword: kw }, enabledKeys });
+              toast("Geminiキー未設定→ローカル生成");
             } else {
               const systemPrompt =
                 "あなたはプロンプトエンジニアリングのエキスパートです。ユーザーの目的を深く理解し、最高の結果を引き出すための「System Instruction」と「User Prompt」を含んだ構造的なプロンプトを、日本語で作成してください。";
@@ -706,70 +985,13 @@
           toast("生成しました");
         } catch (e) {
           console.error(e);
-          toast("生成中にエラー");
+          toast("生成エラー");
         } finally {
           setIsGenerating(false);
         }
       };
 
-      // ===== Backup / Import / Export =====
-      const exportAll = () => {
-        downloadText(`PromptHub_Backup_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(state, null, 2));
-      };
-
-      const importAll = async (file) => {
-        if (!file) return;
-        try {
-          const txt = await file.text();
-          const obj = JSON.parse(txt);
-          if (!obj || typeof obj !== "object") throw new Error("bad");
-
-          const mergeArr = (a, b, prefix) => {
-            const map = new Map((a||[]).map(x => [x.id, x]));
-            (b||[]).forEach(it => {
-              if (!it) return;
-              const id0 = it.id || uid(prefix);
-              if (map.has(id0)) map.set(uid(prefix), { ...it, id: uid(prefix) });
-              else map.set(id0, { ...it, id: id0 });
-            });
-            return Array.from(map.values());
-          };
-
-          const cur = state;
-          const inc = obj;
-          const out = JSON.parse(JSON.stringify(cur));
-
-          out.personal = out.personal || { folders:[], prompts:[] };
-          out.shared = out.shared || { folders:[], prompts:[] };
-
-          if (inc.personal) {
-            out.personal.folders = mergeArr(out.personal.folders, inc.personal.folders, "f");
-            out.personal.prompts = mergeArr(out.personal.prompts, inc.personal.prompts, "p");
-          }
-          if (inc.shared) {
-            out.shared.folders = mergeArr(out.shared.folders, inc.shared.folders, "sf");
-            out.shared.prompts = mergeArr(out.shared.prompts, inc.shared.prompts, "sp");
-          }
-          if (Array.isArray(inc.templates)) {
-            out.templates = mergeArr(out.templates || [], inc.templates, "tpl");
-          }
-          out.settings = out.settings || {};
-          if (inc.settings?.pinnedTags) out.settings.pinnedTags = dedupe([...(out.settings.pinnedTags||[]), ...inc.settings.pinnedTags]);
-
-          if (!out.settings.genProvider) out.settings.genProvider = inc.settings?.genProvider || "local";
-          if (!out.settings.geminiModel) out.settings.geminiModel = inc.settings?.geminiModel || "gemini-2.5-flash";
-          if (!out.settings.geminiKey) out.settings.geminiKey = inc.settings?.geminiKey || "";
-          if (!out.settings.similarityThreshold) out.settings.similarityThreshold = inc.settings?.similarityThreshold ?? 0.72;
-          if (!out.settings.formEnabledByTpl) out.settings.formEnabledByTpl = inc.settings?.formEnabledByTpl || {};
-
-          setState(out);
-          toast("読み込み（統合）しました");
-        } catch {
-          alert("読み込みに失敗しました（JSON形式を確認）");
-        }
-      };
-
-      // ===== Templates Manage (simple) =====
+      // ===== Templates Manage =====
       const addTemplate = () => {
         const name = prompt("テンプレ名:");
         if (!name || !name.trim()) return;
@@ -778,7 +1000,6 @@
           name: name.trim(),
           desc: "",
           system: "あなたはプロンプトエンジニアです。",
-          user: "キーワード: {{keyword}}\n目的: {{goal}}\n条件: {{constraints}}\n出力形式: {{format}}\n注意: {{notes}}",
           form: { enabledKeys: ["keyword","goal","constraints","format","notes","source"], order: DEFAULT_TEMPLATES[0].form.order }
         };
         setState(prev => ({ ...prev, templates: [t, ...(prev.templates||[])] }));
@@ -808,20 +1029,147 @@
         toast("テンプレ削除");
       };
 
+      // ===== Backup / Import / Export =====
+      const exportAll = () => {
+        downloadText(`PromptHub_All_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(state, null, 2));
+      };
+
+      const exportLibrary = (mode) => {
+        const target = mode === "personal" ? state.personal : state.shared;
+        downloadText(`PromptHub_${mode}_Library_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(target, null, 2));
+      };
+
+      const exportSelectedPrompt = () => {
+        if (!selectedPrompt) return;
+        const p = { ...selectedPrompt, tags: normalizeTags(tagsInput) };
+        downloadText(`Prompt_${(p.title||"untitled").slice(0,24)}.json`, JSON.stringify(p, null, 2));
+        toast("プロンプトを書き出し");
+      };
+
+      const importAll = async (file) => {
+        if (!file) return;
+        try {
+          const txt = await file.text();
+          const obj = JSON.parse(txt);
+          if (!obj || typeof obj !== "object") throw new Error("bad");
+
+          const mergeArr = (a, b, prefix) => {
+            const map = new Map((a||[]).map(x => [x.id, x]));
+            (b||[]).forEach(it => {
+              if (!it) return;
+              const id0 = it.id || uid(prefix);
+              if (map.has(id0)) map.set(uid(prefix), { ...it, id: uid(prefix) });
+              else map.set(id0, { ...it, id: id0 });
+            });
+            return Array.from(map.values());
+          };
+
+          const cur = state;
+          const inc = obj;
+          const out = JSON.parse(JSON.stringify(cur));
+
+          out.personal = out.personal || { folders:[], prompts:[], trash:[] };
+          out.shared = out.shared || { folders:[], prompts:[], trash:[] };
+          if (!out.history) out.history = { personal:{}, shared:{} };
+
+          if (inc.personal) {
+            out.personal.folders = mergeArr(out.personal.folders, inc.personal.folders, "f");
+            out.personal.prompts  = mergeArr(out.personal.prompts,  inc.personal.prompts,  "p");
+            out.personal.trash    = mergeArr(out.personal.trash,    inc.personal.trash,    "t");
+          }
+          if (inc.shared) {
+            out.shared.folders = mergeArr(out.shared.folders, inc.shared.folders, "sf");
+            out.shared.prompts  = mergeArr(out.shared.prompts,  inc.shared.prompts,  "sp");
+            out.shared.trash    = mergeArr(out.shared.trash,    inc.shared.trash,    "st");
+          }
+
+          if (Array.isArray(inc.templates)) out.templates = mergeArr(out.templates || [], inc.templates, "tpl");
+
+          out.settings = out.settings || {};
+          if (inc.settings?.pinnedTags) out.settings.pinnedTags = dedupe([...(out.settings.pinnedTags||[]), ...inc.settings.pinnedTags]);
+
+          if (!out.settings.genProvider) out.settings.genProvider = inc.settings?.genProvider || "local";
+          if (!out.settings.geminiModel) out.settings.geminiModel = inc.settings?.geminiModel || "gemini-2.5-flash";
+          if (!out.settings.geminiKey) out.settings.geminiKey = inc.settings?.geminiKey || "";
+          if (!out.settings.similarityThreshold) out.settings.similarityThreshold = inc.settings?.similarityThreshold ?? 0.72;
+          if (!out.settings.formEnabledByTpl) out.settings.formEnabledByTpl = inc.settings?.formEnabledByTpl || {};
+          if (typeof out.settings.enableAutoTagOnSave !== "boolean") out.settings.enableAutoTagOnSave = !!inc.settings?.enableAutoTagOnSave;
+          if (!out.settings.maxVersions) out.settings.maxVersions = inc.settings?.maxVersions || 30;
+
+          // merge history shallow
+          if (inc.history?.personal) out.history.personal = { ...out.history.personal, ...inc.history.personal };
+          if (inc.history?.shared) out.history.shared = { ...out.history.shared, ...inc.history.shared };
+
+          setState(out);
+          toast("読み込み（統合）しました");
+        } catch {
+          alert("読み込みに失敗しました（JSON形式を確認）");
+        }
+      };
+
+      const importLibraryOnly = async (file) => {
+        if (!file) return;
+        try {
+          const txt = await file.text();
+          const obj = JSON.parse(txt);
+          if (!obj || typeof obj !== "object") throw new Error("bad");
+          if (!obj.folders || !obj.prompts) throw new Error("not library");
+          const merged = { folders: obj.folders || [], prompts: obj.prompts || [], trash: obj.trash || [] };
+          setLib(merged);
+          toast("ライブラリを読み込み");
+        } catch {
+          alert("読み込みに失敗しました（ライブラリJSONを確認）");
+        }
+      };
+
+      // ===== Tag Manager (replace/delete) =====
+      const replaceTagAcrossLibrary = (fromTag, toTag) => {
+        const from = (fromTag || "").trim();
+        const to = (toTag || "").trim();
+        if (!from) return;
+        const nextPrompts = prompts.map(p => {
+          const tags = (p.tags||[]).filter(Boolean);
+          if (!tags.includes(from)) return p;
+          const next = tags.filter(t => t !== from);
+          if (to) next.push(to);
+          return { ...p, tags: dedupe(next).slice(0,80), updatedAt: nowISO() };
+        });
+        const nextTrash = trash.map(p => {
+          const tags = (p.tags||[]).filter(Boolean);
+          if (!tags.includes(from)) return p;
+          const next = tags.filter(t => t !== from);
+          if (to) next.push(to);
+          return { ...p, tags: dedupe(next).slice(0,80) };
+        });
+        setLib({ ...lib, prompts: nextPrompts, trash: nextTrash });
+
+        if (selectedPrompt?.id) {
+          const updated = nextPrompts.find(x => x.id === selectedPrompt.id) || nextTrash.find(x => x.id === selectedPrompt.id);
+          if (updated) {
+            setSelectedPrompt(updated);
+            setTagsInput((updated.tags||[]).join(", "));
+          }
+        }
+        toast(to ? `#${from} → #${to}` : `#${from} を削除`);
+      };
+
       // ===== Settings =====
       const resetAll = () => {
         if (!confirm("全データを初期化しますか？（戻せません）")) return;
         const fresh = {
-          personal: { folders: [], prompts: [] },
-          shared: { folders: [], prompts: [] },
+          personal: { folders: [], prompts: [], trash: [] },
+          shared: { folders: [], prompts: [], trash: [] },
           templates: DEFAULT_TEMPLATES,
+          history: { personal: {}, shared: {} },
           settings: {
             pinnedTags: ["保護者","職員","学級通信","研修","危機管理","ICT","通知文"],
             genProvider: "local",
             geminiKey: "",
             geminiModel: "gemini-2.5-flash",
             similarityThreshold: 0.72,
-            formEnabledByTpl: {}
+            formEnabledByTpl: {},
+            enableAutoTagOnSave: false,
+            maxVersions: 30
           }
         };
         setState(fresh);
@@ -830,10 +1178,123 @@
         setSelectedPrompt(null);
         setTagsInput("");
         setKeyword("");
+        setTagFilter("");
+        setShowTrash(false);
+        setBulkMode(false);
+        setSelectedIds(new Set());
         toast("初期化しました");
       };
 
-      // ===== UI components for form fields =====
+      // ===== Versions =====
+      const versions = useMemo(() => {
+        if (!selectedPrompt) return [];
+        return getVersions(selectedPrompt.id);
+      }, [selectedPrompt?.id, state.history, libraryMode]);
+
+      const restoreVersion = (v) => {
+        if (!selectedPrompt) return;
+        const restored = {
+          ...selectedPrompt,
+          title: v.title || selectedPrompt.title || "",
+          content: v.content || "",
+          tags: v.tags || [],
+          folderId: v.folderId || selectedPrompt.folderId || "",
+          starred: (typeof v.starred === "boolean") ? v.starred : selectedPrompt.starred,
+          updatedAt: nowISO()
+        };
+        setSelectedPrompt(restored);
+        setTagsInput((restored.tags||[]).join(", "));
+        toast("この版をエディタへ復元（未保存）");
+      };
+
+      const restoreVersionAndSave = (v) => {
+        restoreVersion(v);
+        setTimeout(() => saveCurrentPrompt(true), 0);
+      };
+
+      // ===== Command Palette =====
+      const commands = useMemo(() => {
+        const hasSel = !!selectedPrompt;
+        const bulkCount = selectedIds.size;
+
+        const base = [
+          { key:"new", label:"新規作成", hint:"新しいプロンプトを作成", run: () => createNewPrompt() },
+          { key:"save", label:"保存（重複チェック）", hint:"Ctrl/Cmd+S", run: () => hasSel && saveCurrentPrompt(false), disabled: !hasSel },
+          { key:"save_force", label:"保存（強制）", hint:"重複無視で保存", run: () => hasSel && saveCurrentPrompt(true), disabled: !hasSel },
+          { key:"duplicate", label:"複製", hint:"選択中を複製", run: () => hasSel && duplicatePrompt(), disabled: !hasSel },
+          { key:"copy", label:"内容コピー", hint:"クリップボードへ", run: async () => { if (!hasSel) return; const ok = await tryCopy(selectedPrompt.content||""); toast(ok?"コピーしました":"コピー失敗"); }, disabled: !hasSel },
+          { key:"history", label:"履歴（バージョン）を開く", hint:"保存履歴", run: () => hasSel && setVersionsOpen(true), disabled: !hasSel },
+          { key:"toggle_bulk", label: bulkMode ? "複数選択モードをOFF" : "複数選択モードをON", hint:"一括操作", run: () => { setBulkMode(!bulkMode); clearSelection(); } },
+          { key:"select_all", label:`（一括）表示中を全選択`, hint:"Bulk", run: () => { setBulkMode(true); selectAllFiltered(); }, disabled: filteredList.length === 0 },
+          { key:"export_selected", label:`（一括）選択分を書き出し`, hint:"JSON", run: () => bulkExportJSON(), disabled: !bulkCount },
+          { key:"copy_other", label:`（一括）${libraryMode==="personal"?"共有庫":"個人庫"}へコピー`, hint:"Bulk", run: () => bulkCopyToOtherLibrary(), disabled: !bulkCount },
+          { key:"settings", label:"設定を開く", hint:"生成/類似度/タグ", run: () => setSettingsOpen(true) },
+          { key:"templates", label:"テンプレ管理を開く", hint:"追加/編集/削除", run: () => setTemplatesOpen(true) },
+          { key:"backup", label:"バックアップを開く", hint:"JSON入出力", run: () => setBackupOpen(true) },
+          { key:"tags", label:"タグ管理を開く", hint:"置換/削除", run: () => setTagsOpen(true) },
+          { key:"folders", label:"フォルダ管理を開く", hint:"名前変更/削除", run: () => setFoldersOpen(true) },
+          { key:"trash", label: showTrash ? "ゴミ箱を閉じる" : "ゴミ箱を開く", hint:"復元/完全削除", run: () => { setShowTrash(!showTrash); clearSelection(); setBulkMode(false); } },
+          { key:"toggle_staronly", label: starOnly ? "スターだけ表示をOFF" : "スターだけ表示をON", hint:"フィルタ", run: () => setStarOnly(!starOnly) },
+          { key:"toggle_lib", label: libraryMode==="personal" ? "共有庫へ切替" : "個人庫へ切替", hint:"庫の切替", run: () => setLibraryMode(libraryMode==="personal" ? "shared" : "personal") },
+        ];
+        return base;
+      }, [selectedPrompt, bulkMode, selectedIds, filteredList.length, showTrash, starOnly, libraryMode, state]);
+
+      const [cmdQuery, setCmdQuery] = useState("");
+      const filteredCmd = useMemo(() => {
+        const q = safeLower(cmdQuery.trim());
+        if (!q) return commands;
+        return commands.filter(c => safeLower(c.label).includes(q) || safeLower(c.hint||"").includes(q));
+      }, [cmdQuery, commands]);
+
+      // ===== Keyboard shortcuts =====
+      useEffect(() => {
+        const handler = (e) => {
+          const key = e.key;
+          const meta = e.metaKey || e.ctrlKey;
+
+          // Esc closes modals
+          if (key === "Escape") {
+            setCommandOpen(false);
+            setSimilarOpen(false);
+            setSettingsOpen(false);
+            setTemplatesOpen(false);
+            setBackupOpen(false);
+            setTagsOpen(false);
+            setFoldersOpen(false);
+            setVersionsOpen(false);
+            return;
+          }
+
+          // / focus search (avoid when typing in input/textarea)
+          if (key === "/" && !meta) {
+            const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
+            const editable = tag === "input" || tag === "textarea" || e.target?.isContentEditable;
+            if (!editable) {
+              e.preventDefault();
+              searchRef.current?.focus?.();
+            }
+          }
+
+          // Cmd/Ctrl+S save
+          if (meta && key.toLowerCase() === "s") {
+            e.preventDefault();
+            if (selectedPrompt) saveCurrentPrompt(false);
+            else toast("保存対象がありません");
+          }
+
+          // Cmd/Ctrl+K command palette
+          if (meta && key.toLowerCase() === "k") {
+            e.preventDefault();
+            setCommandOpen(true);
+            setCmdQuery("");
+          }
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+      }, [selectedPrompt, saveCurrentPrompt]);
+
+      // ===== Field input component =====
       const FieldInput = ({ k }) => {
         const meta = FIELD_META[k];
         if (!meta) return null;
@@ -877,10 +1338,10 @@
         <Modal
           open={settingsOpen}
           onClose={() => setSettingsOpen(false)}
-          title="設定（ローカル保存 / 生成方式 / 類似判定）"
+          title="設定（ローカル保存 / 生成方式 / 類似判定 / 自動タグ / 履歴）"
           icon={<Ico name="settings" size={20} className="text-indigo-600" />}
           footer={
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <button
                 onClick={resetAll}
                 className="px-4 py-2 rounded-2xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-sm font-bold text-rose-700"
@@ -906,9 +1367,29 @@
                 setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), pinnedTags: tags } }));
               }}
             />
-            <div className="text-xs text-slate-500">固定タグ + 頻出タグ + 本文抽出タグ を候補チップとして表示。</div>
 
-            <div className="pt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-sm font-bold text-slate-700">保存時に本文抽出タグを自動追加</div>
+                <button
+                  onClick={() => setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), enableAutoTagOnSave: !prev.settings.enableAutoTagOnSave } }))}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold border ${state.settings?.enableAutoTagOnSave ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+                >
+                  {state.settings?.enableAutoTagOnSave ? "ON" : "OFF"}
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">履歴保存数（最大）</div>
+                <select
+                  className="w-full p-3 rounded-2xl border border-slate-200 bg-white outline-none"
+                  value={Number(state.settings?.maxVersions ?? 30)}
+                  onChange={(e)=> setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), maxVersions: Number(e.target.value) } }))}
+                >
+                  {[10,20,30,50].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+
               <div className="space-y-1">
                 <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">生成方式</div>
                 <select
@@ -957,7 +1438,15 @@
                     {(Number(state.settings?.similarityThreshold ?? 0.72)).toFixed(2)}
                   </div>
                 </div>
-                <div className="text-[11px] text-slate-500">高いほど「重複」に厳しくなります（おすすめ 0.70〜0.78）。</div>
+                <div className="text-[11px] text-slate-500">おすすめ：0.70〜0.78</div>
+              </div>
+
+              <div className="md:col-span-2 bg-slate-50 border border-slate-200 rounded-2xl p-3 text-xs text-slate-600 leading-relaxed">
+                <div className="font-bold text-slate-700 mb-1">ショートカット</div>
+                <div>・Ctrl/Cmd + S：保存</div>
+                <div>・/：検索にフォーカス</div>
+                <div>・Ctrl/Cmd + K：コマンドパレット</div>
+                <div>・Esc：モーダルを閉じる</div>
               </div>
             </div>
           </div>
@@ -1017,29 +1506,183 @@
           open={backupOpen}
           onClose={() => setBackupOpen(false)}
           title="バックアップ / 復元（JSON）"
-          icon={<Ico name="database-backup" size={20} className="text-indigo-600" />}
+          icon={<Ico name="database" size={20} className="text-indigo-600" />}
           footer={
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <button
                 onClick={exportAll}
                 className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
               >
-                全データを書き出し
+                全体を書き出し
               </button>
+
+              <button
+                onClick={() => exportLibrary("personal")}
+                className="px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700"
+              >
+                個人庫を書き出し
+              </button>
+
+              <button
+                onClick={() => exportLibrary("shared")}
+                className="px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700"
+              >
+                共有庫を書き出し
+              </button>
+
               <label className="px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700 cursor-pointer">
-                JSONを読み込む
+                全体JSONを読み込む（統合）
                 <input type="file" accept="application/json" className="hidden"
                   onChange={(e) => importAll(e.target.files?.[0])}
+                />
+              </label>
+
+              <label className="px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700 cursor-pointer">
+                今の庫にライブラリJSONを読み込む（置換）
+                <input type="file" accept="application/json" className="hidden"
+                  onChange={(e) => importLibraryOnly(e.target.files?.[0])}
                 />
               </label>
             </div>
           }
         >
           <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-sm text-amber-900">
-            <div className="font-bold">共有（職員で共通のプロンプト庫）について</div>
+            <div className="font-bold">共有（クラウド無し運用）</div>
             <div className="text-xs text-amber-800 mt-1 leading-relaxed">
-              クラウド無し運用なので、共有は「共有庫に入れる→JSON出力→配布→他端末で読み込み」で実現できます。
+              共有は「共有庫にコピー → 共有庫JSONを書き出し → 配布 → 各端末で読み込み」で実現できます。
+              （選択分だけのJSON書き出しも、複数選択モードで可能）
             </div>
+          </div>
+
+          {selectedPrompt && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-bold text-slate-700">選択中プロンプト</div>
+                <button
+                  onClick={exportSelectedPrompt}
+                  className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
+                >
+                  このプロンプトを書き出し
+                </button>
+              </div>
+              <div className="text-xs text-slate-500 mt-2">個別に配布したいときに便利。</div>
+            </div>
+          )}
+        </Modal>
+      );
+
+      const TagsModal = (
+        <Modal
+          open={tagsOpen}
+          onClose={() => setTagsOpen(false)}
+          title="タグ管理（削除 / 置換：ライブラリ全体）"
+          icon={<Ico name="tag" size={20} className="text-indigo-600" />}
+          footer={
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={() => setTagsOpen(false)}
+                className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
+              >
+                閉じる
+              </button>
+            </div>
+          }
+        >
+          <div className="text-sm text-slate-600">
+            今の庫（{libraryMode === "personal" ? "個人庫" : "共有庫"}）のタグを一括整理できます（ゴミ箱も対象）。
+          </div>
+
+          <div className="space-y-2 max-h-[55vh] overflow-y-auto no-scrollbar pr-1">
+            {tagStats.length === 0 ? (
+              <div className="p-6 text-center text-slate-400">タグがありません</div>
+            ) : (
+              tagStats.map(({tag,count}) => (
+                <div key={tag} className="bg-white border border-slate-200 rounded-2xl p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-800 truncate">#{tag}</div>
+                      <div className="text-xs text-slate-500 mt-1">使用数：{count}</div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const to = prompt(`「#${tag}」を何に置換しますか？\n空欄なら削除`, "");
+                          if (to === null) return;
+                          replaceTagAcrossLibrary(tag, (to||"").trim());
+                        }}
+                        className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
+                      >
+                        置換/削除
+                      </button>
+
+                      <button
+                        onClick={() => { setTagFilter(tag); setTagsOpen(false); toast(`#${tag} で絞り込み`); }}
+                        className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold"
+                      >
+                        このタグで絞る
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </Modal>
+      );
+
+      const FoldersModal = (
+        <Modal
+          open={foldersOpen}
+          onClose={() => setFoldersOpen(false)}
+          title="フォルダ管理（名前変更 / 削除）"
+          icon={<Ico name="folder" size={20} className="text-indigo-600" />}
+          footer={
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={createFolder}
+                className="px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700"
+              >
+                フォルダ追加
+              </button>
+              <button
+                onClick={() => setFoldersOpen(false)}
+                className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
+              >
+                閉じる
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-2 max-h-[55vh] overflow-y-auto no-scrollbar pr-1">
+            {folders.length === 0 ? (
+              <div className="p-6 text-center text-slate-400">フォルダがありません</div>
+            ) : (
+              folders.map(f => (
+                <div key={f.id} className="bg-white border border-slate-200 rounded-2xl p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-slate-800 truncate">{f.name}</div>
+                      <div className="text-xs text-slate-500 mt-1">ID: {f.id}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => renameFolder(f.id)}
+                        className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
+                      >
+                        名前変更
+                      </button>
+                      <button
+                        onClick={() => deleteFolder(f.id)}
+                        className="px-3 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-xs font-bold text-rose-700"
+                      >
+                        削除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </Modal>
       );
@@ -1062,11 +1705,10 @@
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    // open the most similar
                     const top = similarMatches?.[0];
                     if (top) {
                       const target = prompts.find(p => p.id === top.id);
-                      if (target) setSelectedPrompt(target);
+                      if (target) openPrompt(target);
                       setSimilarOpen(false);
                       setPendingSave(null);
                       toast("類似プロンプトを開きました");
@@ -1092,7 +1734,7 @@
           }
         >
           <div className="text-sm text-slate-700">
-            しきい値以上の類似度が検出されました。重複を避けたい場合は「一番近いのを開く」をおすすめ。
+            しきい値以上の類似度が検出されました。重複を避けたい場合は「一番近いのを開く」推奨。
           </div>
 
           <div className="space-y-2">
@@ -1106,7 +1748,7 @@
                   className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
                   onClick={() => {
                     const target = prompts.find(p => p.id === m.id);
-                    if (target) setSelectedPrompt(target);
+                    if (target) openPrompt(target);
                     setSimilarOpen(false);
                     setPendingSave(null);
                     toast("類似プロンプトを開きました");
@@ -1120,23 +1762,168 @@
         </Modal>
       );
 
+      const VersionsModal = (
+        <Modal
+          open={versionsOpen}
+          onClose={() => setVersionsOpen(false)}
+          title={`履歴（バージョン） ${selectedPrompt ? `- ${selectedPrompt.title||"無題"}` : ""}`}
+          icon={<Ico name="history" size={20} className="text-indigo-600" />}
+          footer={
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-slate-500">保存時に自動で履歴化（最大{Number(state.settings?.maxVersions ?? 30)}）</div>
+              <button
+                onClick={() => setVersionsOpen(false)}
+                className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
+              >
+                閉じる
+              </button>
+            </div>
+          }
+        >
+          {!selectedPrompt ? (
+            <div className="p-6 text-center text-slate-400">プロンプト未選択</div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-h-[65vh] overflow-y-auto no-scrollbar pr-1">
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">履歴一覧</div>
+                {versions.length === 0 ? (
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-slate-400">
+                    まだ履歴がありません（保存すると増えます）
+                  </div>
+                ) : (
+                  versions.map(v => (
+                    <div key={v.vid} className="bg-white border border-slate-200 rounded-2xl p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-bold text-slate-800 truncate">{v.title || "（タイトルなし）"}</div>
+                          <div className="text-xs text-slate-500 mt-1">{new Date(v.savedAt).toLocaleString()}</div>
+                          <div className="text-[11px] text-slate-400 mt-2 line-clamp-2">{(v.content||"").slice(0,120)}</div>
+                        </div>
+                        <div className="flex flex-col gap-2 shrink-0">
+                          <button
+                            onClick={() => restoreVersion(v)}
+                            className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
+                          >
+                            エディタへ復元
+                          </button>
+                          <button
+                            onClick={() => restoreVersionAndSave(v)}
+                            className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold"
+                          >
+                            復元して保存
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">現在の内容（参考）</div>
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3">
+                  <div className="text-sm font-bold text-slate-800 mb-2">{selectedPrompt.title || "無題"}</div>
+                  <textarea
+                    readOnly
+                    className="w-full h-[380px] p-3 rounded-2xl border border-slate-200 bg-white text-xs font-mono outline-none resize-none"
+                    value={selectedPrompt.content || ""}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </Modal>
+      );
+
+      const CommandModal = (
+        <Modal
+          open={commandOpen}
+          onClose={() => setCommandOpen(false)}
+          title="コマンドパレット（Ctrl/Cmd+K）"
+          icon={<Ico name="command" size={20} className="text-indigo-600" />}
+          footer={
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-slate-500">Enterで実行 / Escで閉じる</div>
+              <button
+                onClick={() => setCommandOpen(false)}
+                className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
+              >
+                閉じる
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            <input
+              className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-200"
+              placeholder="コマンドを検索（例：保存、履歴、タグ、バックアップ…）"
+              value={cmdQuery}
+              onChange={(e)=>setCmdQuery(e.target.value)}
+              onKeyDown={(e)=>{
+                if (e.key === "Enter") {
+                  const first = filteredCmd.find(c => !c.disabled);
+                  if (first) {
+                    first.run();
+                    setCommandOpen(false);
+                  }
+                }
+              }}
+              autoFocus
+            />
+
+            <div className="max-h-[55vh] overflow-y-auto no-scrollbar space-y-2 pr-1">
+              {filteredCmd.map(cmd => (
+                <button
+                  key={cmd.key}
+                  onClick={() => { if (cmd.disabled) return; cmd.run(); setCommandOpen(false); }}
+                  className={`w-full text-left p-4 rounded-2xl border flex items-center justify-between gap-3 ${
+                    cmd.disabled ? "bg-slate-50 border-slate-100 text-slate-400 cursor-not-allowed" : "bg-white border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="font-bold truncate">{cmd.label}</div>
+                    <div className="text-xs text-slate-500 mt-1 truncate">{cmd.hint || ""}</div>
+                  </div>
+                  <div className="text-xs font-bold text-slate-400">↵</div>
+                </button>
+              ))}
+              {filteredCmd.length === 0 && (
+                <div className="p-6 text-center text-slate-400">該当なし</div>
+              )}
+            </div>
+          </div>
+        </Modal>
+      );
+
       // =========================
-      // Render
+      // UI Render
       // =========================
       return (
         <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
           {/* Toast */}
-          {showToast && (
-            <div className="fixed bottom-6 right-6 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-xl flex items-center gap-2 z-50">
+          {toastObj && (
+            <div className="fixed bottom-6 right-6 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-xl flex items-center gap-3 z-50">
               <Ico name="check-circle-2" size={18} className="text-emerald-400" />
-              <span className="text-sm font-semibold">{showToast}</span>
+              <span className="text-sm font-semibold">{toastObj.msg}</span>
+              {toastObj.actionLabel && (
+                <button
+                  onClick={() => { toastObj.onAction?.(); setToastObj(null); }}
+                  className="ml-2 px-3 py-1 rounded-md bg-white/10 hover:bg-white/20 text-xs font-bold"
+                >
+                  {toastObj.actionLabel}
+                </button>
+              )}
             </div>
           )}
 
           {SettingsModal}
           {TemplatesModal}
           {BackupModal}
+          {TagsModal}
+          {FoldersModal}
           {SimilarModal}
+          {VersionsModal}
+          {CommandModal}
 
           {/* Sidebar */}
           <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
@@ -1146,8 +1933,17 @@
                 <span>PromptHub</span>
               </div>
               <div className="flex items-center gap-1">
+                <button onClick={() => setCommandOpen(true)} className="p-2 rounded-xl hover:bg-slate-100" title="コマンド（Ctrl/Cmd+K）">
+                  <Ico name="command" size={18} className="text-slate-600" />
+                </button>
                 <button onClick={() => setBackupOpen(true)} className="p-2 rounded-xl hover:bg-slate-100" title="バックアップ">
-                  <Ico name="database-backup" size={18} className="text-slate-600" />
+                  <Ico name="database" size={18} className="text-slate-600" />
+                </button>
+                <button onClick={() => setTagsOpen(true)} className="p-2 rounded-xl hover:bg-slate-100" title="タグ管理">
+                  <Ico name="tag" size={18} className="text-slate-600" />
+                </button>
+                <button onClick={() => setFoldersOpen(true)} className="p-2 rounded-xl hover:bg-slate-100" title="フォルダ管理">
+                  <Ico name="folder-cog" size={18} className="text-slate-600" />
                 </button>
                 <button onClick={() => setTemplatesOpen(true)} className="p-2 rounded-xl hover:bg-slate-100" title="テンプレ管理">
                   <Ico name="layout-template" size={18} className="text-slate-600" />
@@ -1161,51 +1957,93 @@
             <div className="p-4 space-y-3 border-b border-slate-100">
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => { setLibraryMode("personal"); setActiveFolderId("all"); setSelectedPrompt(null); }}
+                  onClick={() => { setLibraryMode("personal"); }}
                   className={`px-3 py-2 rounded-xl text-sm font-semibold border ${libraryMode==="personal" ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"}`}
                 >
                   <span className="inline-flex items-center gap-2"><Ico name="user" size={16} />個人</span>
                 </button>
                 <button
-                  onClick={() => { setLibraryMode("shared"); setActiveFolderId("all"); setSelectedPrompt(null); }}
+                  onClick={() => { setLibraryMode("shared"); }}
                   className={`px-3 py-2 rounded-xl text-sm font-semibold border ${libraryMode==="shared" ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"}`}
                 >
                   <span className="inline-flex items-center gap-2"><Ico name="users" size={16} />共有</span>
                 </button>
               </div>
 
-              <button
-                onClick={() => setActiveFolderId("all")}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${activeFolderId === "all" ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-100"}`}
-              >
-                <Ico name="file-text" size={18} />
-                <span className="text-sm font-medium">すべてのプロンプト</span>
-                <span className="ml-auto text-xs text-slate-500">{(lib.prompts||[]).length}</span>
-              </button>
-            </div>
-
-            <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-              <div className="pt-2 pb-2 flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                <span>フォルダ</span>
-                <button onClick={createFolder} className="hover:text-indigo-600" title="フォルダ追加">
-                  <Ico name="folder-plus" size={16} />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { setShowTrash(false); clearSelection(); setBulkMode(false); }}
+                  className={`px-3 py-2 rounded-xl text-sm font-semibold border ${!showTrash ? "bg-indigo-50 text-indigo-700 border-indigo-100" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"}`}
+                >
+                  <span className="inline-flex items-center gap-2"><Ico name="file-text" size={16} />通常</span>
+                </button>
+                <button
+                  onClick={() => { setShowTrash(true); clearSelection(); setBulkMode(false); setSelectedPrompt(null); }}
+                  className={`px-3 py-2 rounded-xl text-sm font-semibold border ${showTrash ? "bg-rose-50 text-rose-700 border-rose-100" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"}`}
+                >
+                  <span className="inline-flex items-center gap-2"><Ico name="trash-2" size={16} />ゴミ箱</span>
                 </button>
               </div>
 
-              {folders.map(folder => (
-                <button
-                  key={folder.id}
-                  onClick={() => setActiveFolderId(folder.id)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${activeFolderId === folder.id ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-100"}`}
-                >
-                  <Ico name="folder" size={18} className={activeFolderId === folder.id ? "text-indigo-500" : "text-slate-400"} />
-                  <span className="text-sm font-medium truncate">{folder.name}</span>
-                </button>
-              ))}
+              {!showTrash && (
+                <>
+                  <button
+                    onClick={() => setActiveFolderId("all")}
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${activeFolderId === "all" ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-100"}`}
+                  >
+                    <Ico name="file-text" size={18} />
+                    <span className="text-sm font-medium">すべてのプロンプト</span>
+                    <span className="ml-auto text-xs text-slate-500">{(lib.prompts||[]).length}</span>
+                  </button>
+
+                  {tagFilter && (
+                    <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                      <div className="text-xs font-bold text-amber-800 truncate">タグ絞り込み：#{tagFilter}</div>
+                      <button onClick={() => setTagFilter("")} className="p-1 rounded-lg hover:bg-amber-100" title="解除">
+                        <Ico name="x" size={14} className="text-amber-700" />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+              {!showTrash && (
+                <>
+                  <div className="pt-2 pb-2 flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <span>フォルダ</span>
+                    <button onClick={createFolder} className="hover:text-indigo-600" title="フォルダ追加">
+                      <Ico name="folder-plus" size={16} />
+                    </button>
+                  </div>
+
+                  {folders.map(folder => (
+                    <button
+                      key={folder.id}
+                      onClick={() => setActiveFolderId(folder.id)}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-md transition-colors ${activeFolderId === folder.id ? "bg-indigo-50 text-indigo-700" : "hover:bg-slate-100"}`}
+                    >
+                      <Ico name="folder" size={18} className={activeFolderId === folder.id ? "text-indigo-500" : "text-slate-400"} />
+                      <span className="text-sm font-medium truncate">{folder.name}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {showTrash && (
+                <div className="bg-rose-50 border border-rose-100 rounded-2xl p-4 text-sm text-rose-800">
+                  <div className="font-black mb-1">ゴミ箱</div>
+                  <div className="text-xs leading-relaxed">
+                    削除はここに移動。復元または完全削除できます。<br/>
+                    複数選択して一括復元/完全削除も可能。
+                  </div>
+                </div>
+              )}
             </nav>
 
             <div className="p-4 border-t border-slate-100 text-xs text-slate-400">
-              Firebase削除 / localStorage運用
+              Firebaseなし / localStorage運用（MAX全部入り）
             </div>
           </aside>
 
@@ -1215,8 +2053,9 @@
               <div className="relative">
                 <Ico name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
+                  ref={searchRef}
                   type="text"
-                  placeholder="検索（タイトル/本文/タグ）"
+                  placeholder="検索（タイトル/本文/タグ）  ※ / でフォーカス"
                   className="w-full pl-9 pr-4 py-2 bg-slate-100 border-none rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -1224,63 +2063,158 @@
               </div>
 
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setStarOnly(!starOnly)}
-                  className={`px-3 py-2 rounded-lg text-xs font-semibold border flex items-center gap-2 ${starOnly ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
-                >
-                  <Ico name="star" size={16} className={starOnly ? "text-amber-500" : "text-slate-300"} />
-                  スターだけ
-                </button>
+                {!showTrash && (
+                  <button
+                    onClick={() => setStarOnly(!starOnly)}
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold border flex items-center gap-2 ${starOnly ? "bg-amber-50 border-amber-200 text-amber-800" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                  >
+                    <Ico name="star" size={16} className={starOnly ? "text-amber-500" : "text-slate-300"} />
+                    スターだけ
+                  </button>
+                )}
 
                 <button
-                  onClick={createNewPrompt}
-                  className="ml-auto flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                  onClick={() => { setBulkMode(!bulkMode); clearSelection(); }}
+                  className={`px-3 py-2 rounded-lg text-xs font-semibold border flex items-center gap-2 ${bulkMode ? "bg-indigo-50 border-indigo-200 text-indigo-800" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
                 >
-                  <Ico name="plus" size={16} />
-                  新規作成
+                  <Ico name="check-square" size={16} className={bulkMode ? "text-indigo-600" : "text-slate-300"} />
+                  複数選択
                 </button>
+
+                {!showTrash && (
+                  <button
+                    onClick={createNewPrompt}
+                    className="ml-auto flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                  >
+                    <Ico name="plus" size={16} />
+                    新規作成
+                  </button>
+                )}
+
+                {showTrash && (
+                  <button
+                    onClick={() => { setBulkMode(true); selectAllFiltered(); }}
+                    className="ml-auto flex items-center justify-center gap-2 px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm"
+                  >
+                    <Ico name="check-check" size={16} />
+                    全選択
+                  </button>
+                )}
               </div>
+
+              {/* quick tag filter chips */}
+              {!showTrash && tagSuggestions.length > 0 && (
+                <div className="pt-1">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+                    タグで絞る（クリック）
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {tagSuggestions.slice(0, 18).map((t, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { setTagFilter(t); toast(`#${t} で絞り込み`); }}
+                        className={`text-[11px] font-bold px-3 py-1 rounded-full border transition-colors ${
+                          tagFilter === t ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        #{t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto border-t border-slate-100">
-              {filteredPrompts.length === 0 ? (
-                <div className="p-8 text-center text-slate-400 text-sm">プロンプトがありません</div>
+              {filteredList.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-sm">
+                  {showTrash ? "ゴミ箱は空です" : "プロンプトがありません"}
+                </div>
               ) : (
-                filteredPrompts.map(p => (
+                filteredList.map(p => (
                   <div
                     key={p.id}
-                    onClick={() => setSelectedPrompt(p)}
-                    className={`p-4 border-b border-slate-50 cursor-pointer transition-colors group ${selectedPrompt?.id === p.id ? "bg-indigo-50/50 border-l-4 border-l-indigo-500" : "hover:bg-slate-50"}`}
+                    onClick={() => {
+                      if (bulkMode) toggleSelect(p.id);
+                      else openPrompt(p);
+                    }}
+                    className={`p-4 border-b border-slate-50 cursor-pointer transition-colors group ${
+                      selectedPrompt?.id === p.id && !bulkMode ? "bg-indigo-50/50 border-l-4 border-l-indigo-500" : "hover:bg-slate-50"
+                    }`}
                   >
-                    <div className="flex justify-between items-start mb-1 gap-2">
-                      <h3 className={`font-semibold text-sm truncate ${selectedPrompt?.id === p.id ? "text-indigo-700" : "text-slate-700"}`}>
-                        {p.title || "無題のプロンプト"}
-                      </h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 min-w-0">
+                        {bulkMode && (
+                          <button
+                            onClick={(e)=>{ e.stopPropagation(); toggleSelect(p.id); }}
+                            className={`mt-0.5 h-5 w-5 rounded border flex items-center justify-center ${
+                              selectedIds.has(p.id) ? "bg-indigo-600 border-indigo-600" : "bg-white border-slate-300"
+                            }`}
+                            title="選択"
+                          >
+                            {selectedIds.has(p.id) && <Ico name="check" size={14} className="text-white" />}
+                          </button>
+                        )}
 
+                        <div className="min-w-0">
+                          <h3 className={`font-semibold text-sm truncate ${selectedPrompt?.id === p.id && !bulkMode ? "text-indigo-700" : "text-slate-700"}`}>
+                            {p.title || (showTrash ? "（タイトルなし）" : "無題のプロンプト")}
+                          </h3>
+                          <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mt-1">
+                            {p.content || "内容なし"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* right actions */}
                       <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggleStar(p.id); }}
-                          className="p-1.5 rounded-md hover:bg-white"
-                          title="スター"
-                        >
-                          <Ico name="star" size={16} className={p.starred ? "text-amber-500" : "text-slate-300"} />
-                        </button>
+                        {!showTrash && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleStar(p.id); }}
+                            className="p-1.5 rounded-md hover:bg-white"
+                            title="スター"
+                          >
+                            <Ico name="star" size={16} className={p.starred ? "text-amber-500" : "text-slate-300"} />
+                          </button>
+                        )}
 
-                        <button
-                          onClick={(e) => { e.stopPropagation(); deletePrompt(p.id); }}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-rose-50 transition-opacity"
-                          title="削除"
-                        >
-                          <Ico name="trash-2" size={16} className="text-rose-600" />
-                        </button>
+                        {!bulkMode && !showTrash && (
+                          <button
+                            onClick={(e)=>{ e.stopPropagation(); softDeletePrompt(p.id); }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-rose-50 transition-opacity"
+                            title="ゴミ箱へ"
+                          >
+                            <Ico name="trash-2" size={16} className="text-rose-600" />
+                          </button>
+                        )}
+
+                        {!bulkMode && showTrash && (
+                          <>
+                            <button
+                              onClick={(e)=>{ e.stopPropagation(); restoreFromTrash(p.id); }}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-emerald-50 transition-opacity"
+                              title="復元"
+                            >
+                              <Ico name="rotate-ccw" size={16} className="text-emerald-700" />
+                            </button>
+                            <button
+                              onClick={(e)=>{ e.stopPropagation(); purgeFromTrash(p.id); }}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-rose-50 transition-opacity"
+                              title="完全削除"
+                            >
+                              <Ico name="skull" size={16} className="text-rose-700" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
 
-                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{p.content || "内容なし"}</p>
-
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <div className="text-[10px] text-slate-400">
-                        {new Date(p.updatedAt || p.createdAt).toLocaleDateString()}
+                        {showTrash
+                          ? `削除：${new Date(p.deletedAt || p.updatedAt || p.createdAt).toLocaleDateString()}`
+                          : new Date(p.updatedAt || p.createdAt).toLocaleDateString()
+                        }
                       </div>
                       <div className="text-[10px] text-slate-400 truncate">
                         {(p.tags || []).slice(0,3).map(t => `#${t}`).join(" ") }
@@ -1290,6 +2224,154 @@
                 ))
               )}
             </div>
+
+            {/* Bulk Action Bar */}
+            {bulkMode && (
+              <div className="border-t border-slate-200 bg-white p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-bold text-slate-700">
+                    選択：{selectedIds.size} 件
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={selectAllFiltered}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
+                    >
+                      全選択
+                    </button>
+                    <button
+                      onClick={clearSelection}
+                      className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
+                    >
+                      解除
+                    </button>
+                    <button
+                      onClick={() => { setBulkMode(false); clearSelection(); }}
+                      className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold"
+                    >
+                      完了
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="flex-1 p-2 rounded-xl border border-slate-200 bg-slate-50 text-xs outline-none"
+                      placeholder="一括タグ付け（例：研修,ICT,保護者）"
+                      value={bulkTagInput}
+                      onChange={(e)=>setBulkTagInput(e.target.value)}
+                    />
+                    <button
+                      onClick={bulkApplyTags}
+                      disabled={selectedIds.size===0}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold ${
+                        selectedIds.size===0 ? "bg-slate-100 text-slate-400" : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      }`}
+                    >
+                      タグ付与
+                    </button>
+                  </div>
+
+                  {!showTrash && (
+                    <div className="flex items-center gap-2">
+                      <select
+                        className="flex-1 p-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold outline-none"
+                        value={bulkFolderId}
+                        onChange={(e)=>setBulkFolderId(e.target.value)}
+                      >
+                        <option value="">（フォルダなし）</option>
+                        {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                      </select>
+                      <button
+                        onClick={bulkMoveFolder}
+                        disabled={selectedIds.size===0}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold ${
+                          selectedIds.size===0 ? "bg-slate-100 text-slate-400" : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                        }`}
+                      >
+                        移動
+                      </button>
+                      <button
+                        onClick={() => bulkStar(true)}
+                        disabled={selectedIds.size===0}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold ${
+                          selectedIds.size===0 ? "bg-slate-100 text-slate-400" : "bg-amber-600 hover:bg-amber-700 text-white"
+                        }`}
+                        title="スターON"
+                      >
+                        ★ON
+                      </button>
+                      <button
+                        onClick={() => bulkStar(false)}
+                        disabled={selectedIds.size===0}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold ${
+                          selectedIds.size===0 ? "bg-slate-100 text-slate-400" : "bg-slate-600 hover:bg-slate-700 text-white"
+                        }`}
+                        title="スターOFF"
+                      >
+                        ★OFF
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={bulkCopyToOtherLibrary}
+                      disabled={selectedIds.size===0}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold ${
+                        selectedIds.size===0 ? "bg-slate-100 text-slate-400" : "bg-white border border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      {libraryMode==="personal" ? "共有庫へコピー" : "個人庫へコピー"}
+                    </button>
+
+                    <button
+                      onClick={bulkExportJSON}
+                      disabled={selectedIds.size===0}
+                      className={`px-3 py-2 rounded-xl text-xs font-bold ${
+                        selectedIds.size===0 ? "bg-slate-100 text-slate-400" : "bg-white border border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      選択分JSON
+                    </button>
+
+                    {showTrash ? (
+                      <>
+                        <button
+                          onClick={bulkRestore}
+                          disabled={selectedIds.size===0}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold ${
+                            selectedIds.size===0 ? "bg-slate-100 text-slate-400" : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          }`}
+                        >
+                          一括復元
+                        </button>
+                        <button
+                          onClick={bulkDelete}
+                          disabled={selectedIds.size===0}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold ${
+                            selectedIds.size===0 ? "bg-slate-100 text-slate-400" : "bg-rose-600 hover:bg-rose-700 text-white"
+                          }`}
+                        >
+                          一括完全削除
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={bulkDelete}
+                        disabled={selectedIds.size===0}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold ${
+                          selectedIds.size===0 ? "bg-slate-100 text-slate-400" : "bg-rose-600 hover:bg-rose-700 text-white"
+                        }`}
+                      >
+                        一括ゴミ箱へ
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Editor / Generator Area */}
@@ -1328,19 +2410,51 @@
                 >
                   {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
-
-                <button
-                  onClick={() => setSettingsOpen(true)}
-                  className="hidden md:flex p-2 rounded-xl hover:bg-slate-100"
-                  title="設定"
-                >
-                  <Ico name="settings" size={18} className="text-slate-600" />
-                </button>
               </div>
 
               <div className="flex items-center gap-2">
-                {selectedPrompt && (
+                <button
+                  onClick={() => { setCommandOpen(true); setCmdQuery(""); }}
+                  className="p-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
+                  title="コマンド（Ctrl/Cmd+K）"
+                >
+                  <Ico name="command" size={20} />
+                </button>
+
+                {selectedPrompt && !showTrash && (
                   <>
+                    <button
+                      onClick={() => { toggleStar(selectedPrompt.id); }}
+                      className="p-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
+                      title="スター"
+                    >
+                      <Ico name="star" size={20} className={selectedPrompt.starred ? "text-amber-500" : "text-slate-300"} />
+                    </button>
+
+                    <button
+                      onClick={() => setVersionsOpen(true)}
+                      className="p-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
+                      title="履歴（バージョン）"
+                    >
+                      <Ico name="history" size={20} className="text-slate-600" />
+                    </button>
+
+                    <button
+                      onClick={duplicatePrompt}
+                      className="p-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
+                      title="複製"
+                    >
+                      <Ico name="copy-plus" size={20} className="text-slate-600" />
+                    </button>
+
+                    <button
+                      onClick={copyToOtherLibrary}
+                      className="p-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
+                      title={libraryMode === "personal" ? "共有庫にコピー" : "個人庫にコピー"}
+                    >
+                      <Ico name="repeat" size={20} className="text-slate-600" />
+                    </button>
+
                     <button
                       onClick={async () => {
                         const ok = await tryCopy(selectedPrompt.content || "");
@@ -1355,6 +2469,7 @@
                     <button
                       onClick={() => saveCurrentPrompt(false)}
                       className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition-colors"
+                      title="保存（Ctrl/Cmd+S）"
                     >
                       <Ico name="save" size={18} />
                       保存
@@ -1378,6 +2493,7 @@
                   />
                 </div>
 
+                {/* quick meta */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">フォルダ</label>
@@ -1385,10 +2501,34 @@
                       className="w-full p-2 bg-slate-50 border border-slate-200 rounded-md text-sm outline-none focus:border-indigo-500"
                       value={selectedPrompt.folderId || ""}
                       onChange={(e) => setSelectedPrompt({ ...selectedPrompt, folderId: e.target.value })}
+                      disabled={showTrash}
                     >
                       <option value="">フォルダなし</option>
                       {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                     </select>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => { exportSelectedPrompt(); }}
+                        className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
+                      >
+                        個別JSON出力
+                      </button>
+                      <button
+                        onClick={() => setBackupOpen(true)}
+                        className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
+                      >
+                        バックアップ
+                      </button>
+                      {!showTrash ? (
+                        <button
+                          onClick={() => setVersionsOpen(true)}
+                          className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
+                        >
+                          履歴
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="space-y-2 lg:col-span-2">
@@ -1415,7 +2555,7 @@
                       </div>
                     )}
 
-                    {/* one-click suggestions (fixed/frequent) */}
+                    {/* one-click suggestions */}
                     <div className="pt-2">
                       <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">
                         ワンクリック追加（固定 + 頻出）
@@ -1441,19 +2581,14 @@
                       </div>
                     </div>
 
-                    {/* auto suggestions (from title/content) */}
+                    {/* auto suggestions */}
                     <div className="pt-3">
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
                           本文から提案（自動抽出）
                         </div>
                         <button
-                          onClick={() => {
-                            const curr = normalizeTags(tagsInput);
-                            const next = dedupe([...curr, ...autoTags]).slice(0, 32);
-                            setTagsInput(next.join(", "));
-                            toast("自動提案を追加しました");
-                          }}
+                          onClick={applyAutoTagsToInput}
                           className="text-xs font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50"
                           title="抽出タグをまとめて追加"
                         >
@@ -1491,104 +2626,105 @@
                 </div>
 
                 {/* Template Form Builder */}
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-bold text-slate-700 flex items-center gap-2">
-                      <Ico name="layout-template" size={18} className="text-indigo-600" />
-                      テンプレフォーム（項目を選んで組み立て）
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={buildFromFormIntoEditor}
-                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
-                      >
-                        フォームで組み立て
-                      </button>
-                      <button
-                        onClick={() => {
-                          setFormFields({
-                            keyword: "",
-                            audience: "保護者",
-                            goal: "",
-                            constraints: "",
-                            format: "",
-                            must: "",
-                            ban: "",
-                            length: "400字程度",
-                            notes: "",
-                            source: ""
-                          });
-                          toast("フォームをリセット");
-                        }}
-                        className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700"
-                      >
-                        リセット
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-end">
-                    <div className="lg:col-span-1 space-y-1">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">テンプレ</div>
-                      <select
-                        className="w-full p-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold outline-none"
-                        value={templateId}
-                        onChange={(e)=>setTemplateId(e.target.value)}
-                      >
-                        {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                      </select>
-                      <div className="text-[11px] text-slate-500">{template?.desc || ""}</div>
-                    </div>
-
-                    <div className="lg:col-span-2 space-y-1">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">含める項目（クリックでON/OFF）</div>
-                      <div className="flex flex-wrap gap-2">
-                        {(template?.form?.order || Object.keys(FIELD_META)).map((k) => {
-                          const meta = FIELD_META[k];
-                          if (!meta) return null;
-                          const on = new Set(enabledKeys).has(k);
-                          return (
-                            <button
-                              key={k}
-                              onClick={() => toggleFieldEnabled(k)}
-                              className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${
-                                on ? "bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
-                              }`}
-                              title="クリックで切替"
-                            >
-                              {on ? "✓ " : ""}{meta.label}
-                            </button>
-                          );
-                        })}
+                {!showTrash && (
+                  <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-4">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="font-bold text-slate-700 flex items-center gap-2">
+                        <Ico name="layout-template" size={18} className="text-indigo-600" />
+                        テンプレフォーム（選ぶだけで組み立て）
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={buildFromFormIntoEditor}
+                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
+                        >
+                          フォームで組み立て
+                        </button>
+                        <button
+                          onClick={() => {
+                            setFormFields({
+                              keyword: "",
+                              audience: "保護者",
+                              goal: "",
+                              constraints: "",
+                              format: "",
+                              must: "",
+                              ban: "",
+                              length: "400字程度",
+                              notes: "",
+                              source: ""
+                            });
+                            toast("フォームをリセット");
+                          }}
+                          className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700"
+                        >
+                          リセット
+                        </button>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Form inputs */}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    {(template?.form?.order || Object.keys(FIELD_META)).map((k) => {
-                      const meta = FIELD_META[k];
-                      if (!meta) return null;
-                      const on = new Set(enabledKeys).has(k);
-                      return (
-                        <div key={k} className={`space-y-1 ${meta.type==="textarea" ? "lg:col-span-2" : ""} ${on ? "" : "opacity-50"}`}>
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{meta.label}</div>
-                            {!on && <div className="text-[11px] text-slate-400">（OFF）</div>}
-                          </div>
-                          <div className={`${on ? "" : "pointer-events-none"}`}>
-                            <FieldInput k={k} />
-                          </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-end">
+                      <div className="lg:col-span-1 space-y-1">
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">テンプレ</div>
+                        <select
+                          className="w-full p-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold outline-none"
+                          value={templateId}
+                          onChange={(e)=>setTemplateId(e.target.value)}
+                        >
+                          {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                        <div className="text-[11px] text-slate-500">{template?.desc || ""}</div>
+                      </div>
+
+                      <div className="lg:col-span-2 space-y-1">
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">含める項目（クリックでON/OFF）</div>
+                        <div className="flex flex-wrap gap-2">
+                          {(template?.form?.order || Object.keys(FIELD_META)).map((k) => {
+                            const meta = FIELD_META[k];
+                            if (!meta) return null;
+                            const on = new Set(enabledKeys).has(k);
+                            return (
+                              <button
+                                key={k}
+                                onClick={() => toggleFieldEnabled(k)}
+                                className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${
+                                  on ? "bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                                }`}
+                                title="クリックで切替"
+                              >
+                                {on ? "✓ " : ""}{meta.label}
+                              </button>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
+                    </div>
 
-                  <div className="text-[11px] text-slate-500 leading-relaxed">
-                    ※「生成」ボタンは、フォーム内容を元に（ローカル or Gemini）で文章生成。<br/>
-                    ※「フォームで組み立て」は、AI無しでも System/User を即構成してエディタへ反映します。
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      {(template?.form?.order || Object.keys(FIELD_META)).map((k) => {
+                        const meta = FIELD_META[k];
+                        if (!meta) return null;
+                        const on = new Set(enabledKeys).has(k);
+                        return (
+                          <div key={k} className={`space-y-1 ${meta.type==="textarea" ? "lg:col-span-2" : ""} ${on ? "" : "opacity-50"}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{meta.label}</div>
+                              {!on && <div className="text-[11px] text-slate-400">（OFF）</div>}
+                            </div>
+                            <div className={`${on ? "" : "pointer-events-none"}`}>
+                              <FieldInput k={k} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 leading-relaxed">
+                      「生成」：ヘッダーのキーワード＋フォーム内容でローカル/Gemini生成。<br/>
+                      「フォームで組み立て」：AI無しでも System/User を即構成してエディタへ反映。
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Prompt Content */}
                 <div className="flex-1 flex flex-col space-y-2 min-h-[420px]">
@@ -1598,37 +2734,87 @@
                     placeholder="ここにプロンプトの内容が表示されます。自由に編集も可能です。"
                     value={selectedPrompt.content}
                     onChange={(e) => setSelectedPrompt({ ...selectedPrompt, content: e.target.value })}
+                    readOnly={false}
                   />
                 </div>
 
-                <div className="flex items-center justify-between gap-2 pt-2">
-                  <button
-                    onClick={() => deletePrompt(selectedPrompt.id)}
-                    className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-sm font-semibold flex items-center gap-2"
-                  >
-                    <Ico name="trash-2" size={16} />
-                    削除
-                  </button>
-
-                  <div className="flex items-center gap-2">
+                {/* Bottom actions */}
+                <div className="flex items-center justify-between gap-2 pt-2 flex-wrap">
+                  {showTrash ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => restoreFromTrash(selectedPrompt.id)}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2"
+                      >
+                        <Ico name="rotate-ccw" size={16} />
+                        復元
+                      </button>
+                      <button
+                        onClick={() => purgeFromTrash(selectedPrompt.id)}
+                        className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold flex items-center gap-2"
+                      >
+                        <Ico name="skull" size={16} />
+                        完全削除
+                      </button>
+                    </div>
+                  ) : (
                     <button
-                      onClick={async () => {
-                        const ok = await tryCopy(selectedPrompt.content || "");
-                        toast(ok ? "コピーしました" : "コピー失敗");
-                      }}
-                      className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-2"
+                      onClick={() => softDeletePrompt(selectedPrompt.id)}
+                      className="px-4 py-2 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-sm font-semibold flex items-center gap-2"
                     >
-                      <Ico name="copy" size={16} />
-                      内容コピー
+                      <Ico name="trash-2" size={16} />
+                      ゴミ箱へ
                     </button>
+                  )}
 
-                    <button
-                      onClick={() => saveCurrentPrompt(false)}
-                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold flex items-center gap-2"
-                    >
-                      <Ico name="save" size={16} />
-                      保存（重複チェック付）
-                    </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {!showTrash && (
+                      <>
+                        <button
+                          onClick={duplicatePrompt}
+                          className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-2"
+                        >
+                          <Ico name="copy-plus" size={16} />
+                          複製
+                        </button>
+
+                        <button
+                          onClick={copyToOtherLibrary}
+                          className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-2"
+                        >
+                          <Ico name="repeat" size={16} />
+                          {libraryMode === "personal" ? "共有庫へコピー" : "個人庫へコピー"}
+                        </button>
+
+                        <button
+                          onClick={() => setVersionsOpen(true)}
+                          className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-2"
+                        >
+                          <Ico name="history" size={16} />
+                          履歴
+                        </button>
+
+                        <button
+                          onClick={async () => {
+                            const ok = await tryCopy(selectedPrompt.content || "");
+                            toast(ok ? "コピーしました" : "コピー失敗");
+                          }}
+                          className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-2"
+                        >
+                          <Ico name="copy" size={16} />
+                          内容コピー
+                        </button>
+
+                        <button
+                          onClick={() => saveCurrentPrompt(false)}
+                          className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold flex items-center gap-2"
+                          title="Ctrl/Cmd + S"
+                        >
+                          <Ico name="save" size={16} />
+                          保存（重複チェック）
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1638,10 +2824,11 @@
                   <Ico name="wand-2" size={32} />
                 </div>
                 <div className="text-center">
-                  <h2 className="text-slate-600 font-semibold">プロンプト作成</h2>
-                  <p className="text-sm max-w-xs mx-auto mt-2">
-                    上の入力欄にキーワードを入れて「杖」ボタンで生成。<br/>
-                    あるいは「新規作成」→フォームで組み立ても可能。
+                  <h2 className="text-slate-600 font-semibold">プロンプト作成＆管理（全部入りMAX）</h2>
+                  <p className="text-sm max-w-sm mx-auto mt-2">
+                    上の入力欄にキーワード→杖で生成。<br/>
+                    あるいは「新規作成」→フォームで組み立てもOK。<br/>
+                    Ctrl/Cmd+Kでコマンド、Ctrl/Cmd+Sで保存。
                   </p>
                 </div>
               </div>
