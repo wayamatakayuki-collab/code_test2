@@ -22,9 +22,7 @@
     body { -webkit-tap-highlight-color: transparent; }
     .no-scrollbar::-webkit-scrollbar{ display:none; }
     .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
-    .line-clamp-2{
-      display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-    }
+    .line-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   </style>
 </head>
 
@@ -54,7 +52,7 @@
     // =========================
     // Storage Keys
     // =========================
-    const LS_KEY = "prompthub_local_pro_v1";
+    const LS_KEY = "prompthub_local_pro_v2";
 
     // =========================
     // Utils
@@ -69,7 +67,7 @@
         .split(/[,、\n]/)
         .map(s => s.trim())
         .filter(Boolean)
-        .slice(0, 24);
+        .slice(0, 32);
       return dedupe(arr);
     };
 
@@ -104,6 +102,96 @@
       URL.revokeObjectURL(url);
     };
 
+    const normalizeText = (s) => {
+      return (s || "")
+        .toString()
+        .replace(/\s+/g, " ")
+        .replace(/[！!？?、。，．,\.「」『』（）\(\)\[\]【】<>《》"“”'’：:;；]/g, " ")
+        .trim()
+        .toLowerCase();
+    };
+
+    // --- Simple Japanese-ish stopwords for tag extraction
+    const STOP = new Set([
+      "これ","それ","あれ","どれ","ため","など","もの","こと","する","した","して","します","です","ます","ある","いる","そして","また","さらに",
+      "について","から","まで","より","ので","ので","ので","として","よう","ので","この","その","あの","どの","ここ","そこ","あそこ",
+      "今回","本日","先日","明日","昨日","今日","場合","必要","可能","確認","対応","作成","追加","削除","保存","検索","内容","入力","出力",
+      "お願い","ください","します","します","できます","できる","です","ます","です","ます","など","等","的","的に","的な"
+    ]);
+
+    // =========================
+    // Auto Tag Suggestion (from title/content)
+    // =========================
+    const extractTagCandidates = (title, content) => {
+      const text = `${title || ""}\n${content || ""}`.replace(/\s+/g, " ");
+      const candidates = new Map();
+
+      // hashtags first
+      const h = text.matchAll(/#([^\s#]{1,24})/g);
+      for (const m of h) {
+        const tag = (m[1] || "").trim();
+        if (tag) candidates.set(tag, (candidates.get(tag) || 0) + 4);
+      }
+
+      // token patterns: Kanji, Katakana, Latin/Number, mixed
+      const tokens = text.match(/[一-龥]{2,}|[ァ-ヶー]{2,}|[A-Za-z0-9]{2,}|[一-龥ァ-ヶーA-Za-z0-9]{3,}/g) || [];
+      for (let t of tokens) {
+        t = t.trim();
+        if (!t) continue;
+        if (t.length > 18) continue;
+        if (STOP.has(t)) continue;
+
+        // ignore too-hiragana-ish tokens (heuristic)
+        const hiraganaOnly = /^[ぁ-んー]+$/.test(t);
+        if (hiraganaOnly) continue;
+
+        // de-noise common fragments
+        if (/^http/.test(t)) continue;
+        if (/^\d{2,}$/.test(t)) continue;
+
+        const base = t;
+        candidates.set(base, (candidates.get(base) || 0) + 1);
+      }
+
+      // scoring: prefer tokens with Kanji/Katakana
+      const scored = Array.from(candidates.entries()).map(([tag, score]) => {
+        const hasKanji = /[一-龥]/.test(tag);
+        const hasKata = /[ァ-ヶー]/.test(tag);
+        const hasLatin = /[A-Za-z]/.test(tag);
+        const bonus = (hasKanji ? 2 : 0) + (hasKata ? 1 : 0) + (hasLatin ? 0.5 : 0);
+        return { tag, score: score + bonus };
+      });
+
+      scored.sort((a,b)=> b.score - a.score);
+      return scored.map(x=>x.tag).filter(t=> !STOP.has(t)).slice(0, 16);
+    };
+
+    // =========================
+    // Similarity Detection (char 3-gram Jaccard)
+    // =========================
+    const ngrams = (s, n=3, limit=1200) => {
+      const t = normalizeText(s);
+      const set = new Set();
+      if (!t) return set;
+      const L = t.length;
+      const max = Math.min(L - n + 1, limit);
+      for (let i=0; i<max; i++){
+        set.add(t.slice(i, i+n));
+      }
+      return set;
+    };
+
+    const jaccard = (A, B) => {
+      if (!A.size || !B.size) return 0;
+      let inter = 0;
+      // iterate smaller
+      const small = A.size < B.size ? A : B;
+      const big = A.size < B.size ? B : A;
+      for (const x of small) if (big.has(x)) inter++;
+      const union = A.size + B.size - inter;
+      return union ? inter / union : 0;
+    };
+
     // =========================
     // Lucide Icon (UMD)
     // =========================
@@ -119,15 +207,33 @@
     };
 
     // =========================
-    // Default Templates
+    // Default Templates (with form schema)
     // =========================
+    const FIELD_META = {
+      keyword:     { label:"キーワード", type:"text", placeholder:"例：魅力的なSNS投稿" },
+      audience:    { label:"読み手", type:"select", options:["保護者","職員","児童","地域・外部団体","管理職","自分用"] },
+      goal:        { label:"目的", type:"text", placeholder:"例：誤解なく持ち物を伝える" },
+      constraints: { label:"条件", type:"text", placeholder:"例：やさしい/要点先出し/丁寧" },
+      format:      { label:"出力形式", type:"text", placeholder:"例：見出し→本文→箇条書き→締め" },
+      must:        { label:"必ず入れる", type:"text", placeholder:"例：日時/場所/締切/持ち物" },
+      ban:         { label:"禁止", type:"text", placeholder:"例：個人情報/断定/強い言い切り" },
+      length:      { label:"文字数目安", type:"text", placeholder:"例：400字程度" },
+      notes:       { label:"注意", type:"text", placeholder:"例：敬語/固有名詞は伏せる" },
+      source:      { label:"素材", type:"textarea", placeholder:"下書きやメモを貼る（任意）" }
+    };
+
     const DEFAULT_TEMPLATES = [
       {
         id: "tpl_structured",
         name: "万能（System + User）",
         desc: "何でも使える構造化テンプレ。",
         system: "あなたはプロンプトエンジニアリングのエキスパートです。目的に最短で到達するためのプロンプトを作成してください。",
+        // user pattern is now mainly built via form (still available for legacy)
         user: "キーワード: {{keyword}}\n目的: {{goal}}\n条件: {{constraints}}\n出力形式: {{format}}\n注意: {{notes}}",
+        form: {
+          enabledKeys: ["keyword","goal","constraints","format","notes","source"],
+          order: ["keyword","audience","goal","constraints","format","must","ban","length","notes","source"]
+        }
       },
       {
         id: "tpl_school_notice",
@@ -135,6 +241,10 @@
         desc: "連絡文・おたより・通知の強い型。",
         system: "あなたは小学校教員です。読み手に誤解が生まれない、丁寧で分かりやすい文面を作成してください。",
         user: "テーマ: {{keyword}}\n読み手: {{audience}}\n目的: {{goal}}\n必ず入れる項目: {{must}}\n避けたい表現/禁止: {{ban}}\n文字数目安: {{length}}\n素材: {{source}}",
+        form: {
+          enabledKeys: ["keyword","audience","goal","must","ban","length","source"],
+          order: ["keyword","audience","goal","must","ban","length","constraints","format","notes","source"]
+        }
       },
       {
         id: "tpl_minutes",
@@ -142,36 +252,47 @@
         desc: "決定事項・担当・期限が残る。",
         system: "あなたは学校運営の会議を要点整理する専門家です。抜け漏れなく議事録に整えてください。",
         user: "議題: {{keyword}}\n素材メモ: {{source}}\n出力：日時/参加者（不明なら空欄）→議題→決定事項→担当/期限→次回確認",
+        form: {
+          enabledKeys: ["keyword","source","format","notes"],
+          order: ["keyword","audience","source","format","notes","constraints","must","ban","length","goal"]
+        }
       }
     ];
 
     // =========================
-    // Local Generator (AI無しでも動く)
+    // Form Builder → Prompt Builder
     // =========================
-    const localGenerate = ({ keyword, template, fields }) => {
-      const fill = (text) => {
-        return (text || "")
-          .replaceAll("{{keyword}}", keyword || "")
-          .replaceAll("{{goal}}", fields.goal || "")
-          .replaceAll("{{constraints}}", fields.constraints || "")
-          .replaceAll("{{format}}", fields.format || "")
-          .replaceAll("{{notes}}", fields.notes || "")
-          .replaceAll("{{audience}}", fields.audience || "")
-          .replaceAll("{{must}}", fields.must || "")
-          .replaceAll("{{ban}}", fields.ban || "")
-          .replaceAll("{{length}}", fields.length || "")
-          .replaceAll("{{source}}", fields.source || "");
-      };
+    const buildUserPromptFromForm = ({ template, fields, enabledKeys }) => {
+      const order = template?.form?.order || Object.keys(FIELD_META);
+      const enabled = new Set(enabledKeys || template?.form?.enabledKeys || []);
+      const lines = [];
+      for (const key of order) {
+        if (!enabled.has(key)) continue;
+        const meta = FIELD_META[key];
+        const v = (fields?.[key] || "").toString().trim();
+        if (!v) continue; // empty skip
+        // "keyword" label special
+        const label = meta?.label || key;
+        lines.push(`${label}: ${v}`);
+      }
+      // fallback
+      if (!lines.length) {
+        const kw = (fields?.keyword || "").trim();
+        if (kw) lines.push(`キーワード: ${kw}`);
+      }
+      return lines.join("\n");
+    };
 
-      const sys = fill(template?.system || DEFAULT_TEMPLATES[0].system);
-      const usr = fill(template?.user || DEFAULT_TEMPLATES[0].user);
+    const localGenerate = ({ template, fields, enabledKeys }) => {
+      const sys = (template?.system || DEFAULT_TEMPLATES[0].system).trim();
+      const usr = buildUserPromptFromForm({ template, fields, enabledKeys }).trim();
 
       return [
         "【System Instruction】",
-        sys.trim(),
+        sys,
         "",
         "【User Prompt】",
-        usr.trim(),
+        usr,
         "",
         "【チェック】",
         "・不足情報がある場合は質問を最大3つまで。",
@@ -197,15 +318,16 @@
     const initialState = () => {
       const s = loadState();
       if (s) {
-        // safety fill
         if (!s.personal) s.personal = { folders: [], prompts: [] };
         if (!s.shared) s.shared = { folders: [], prompts: [] };
         if (!Array.isArray(s.templates) || s.templates.length === 0) s.templates = DEFAULT_TEMPLATES;
         if (!s.settings) s.settings = {};
         if (!Array.isArray(s.settings.pinnedTags)) s.settings.pinnedTags = ["保護者","職員","学級通信","研修","危機管理","ICT","通知文"];
-        if (!s.settings.genProvider) s.settings.genProvider = "local"; // local | gemini
+        if (!s.settings.genProvider) s.settings.genProvider = "local";
         if (!s.settings.geminiKey) s.settings.geminiKey = "";
         if (!s.settings.geminiModel) s.settings.geminiModel = "gemini-2.5-flash";
+        if (!s.settings.similarityThreshold) s.settings.similarityThreshold = 0.72;
+        if (!s.settings.formEnabledByTpl) s.settings.formEnabledByTpl = {}; // {tplId: [keys]}
         return s;
       }
       return {
@@ -216,13 +338,15 @@
           pinnedTags: ["保護者","職員","学級通信","研修","危機管理","ICT","通知文"],
           genProvider: "local",
           geminiKey: "",
-          geminiModel: "gemini-2.5-flash"
+          geminiModel: "gemini-2.5-flash",
+          similarityThreshold: 0.72,
+          formEnabledByTpl: {}
         }
       };
     };
 
     // =========================
-    // Modal Shell
+    // Modal
     // =========================
     const Modal = ({ open, onClose, title, icon, children, footer }) => {
       if (!open) return null;
@@ -256,7 +380,6 @@
     function App() {
       const [state, setState] = useState(initialState);
 
-      // layout is back to: Sidebar (w-64) / List (w-80) / Main (flex-1)
       const [libraryMode, setLibraryMode] = useState("personal"); // personal/shared
       const lib = libraryMode === "personal" ? state.personal : state.shared;
 
@@ -274,23 +397,36 @@
       const [tagsInput, setTagsInput] = useState("");
       const [templateId, setTemplateId] = useState(state.templates?.[0]?.id || DEFAULT_TEMPLATES[0].id);
 
-      // generator fields (simple but strong)
-      const [genFields, setGenFields] = useState({
+      // Form fields (includes keyword field for template-form)
+      const [formFields, setFormFields] = useState({
+        keyword: "",
         audience: "保護者",
         goal: "",
         constraints: "",
         format: "",
-        notes: "",
         must: "",
         ban: "",
         length: "400字程度",
+        notes: "",
         source: ""
       });
+
+      // Enabled keys per template (フォーム化: 項目のON/OFF)
+      const enabledKeys = useMemo(() => {
+        const tplMap = state.settings?.formEnabledByTpl || {};
+        const tpl = (state.templates || DEFAULT_TEMPLATES).find(t => t.id === templateId) || DEFAULT_TEMPLATES[0];
+        return tplMap[templateId] || tpl?.form?.enabledKeys || ["keyword","goal","constraints","format","notes","source"];
+      }, [state.settings?.formEnabledByTpl, templateId, state.templates]);
 
       // modals
       const [settingsOpen, setSettingsOpen] = useState(false);
       const [templatesOpen, setTemplatesOpen] = useState(false);
       const [backupOpen, setBackupOpen] = useState(false);
+
+      // similarity modal
+      const [similarOpen, setSimilarOpen] = useState(false);
+      const [similarMatches, setSimilarMatches] = useState([]);
+      const [pendingSave, setPendingSave] = useState(null);
 
       // persist
       useEffect(() => {
@@ -298,10 +434,15 @@
         return () => clearTimeout(t);
       }, [state]);
 
-      // selection tag sync
+      // sync tags input when select
       useEffect(() => {
         if (!selectedPrompt) return;
         setTagsInput((selectedPrompt.tags || []).join(", "));
+        // also prefill form keyword from title if empty
+        setFormFields(prev => ({
+          ...prev,
+          keyword: prev.keyword || (selectedPrompt.title || "").replace(/のプロンプト$/,"").trim(),
+        }));
       }, [selectedPrompt?.id]);
 
       const toast = (msg) => {
@@ -313,6 +454,7 @@
       const prompts = lib.prompts || [];
       const templates = state.templates || DEFAULT_TEMPLATES;
 
+      // tag chips base (fixed + frequent)
       const pinnedTags = state.settings?.pinnedTags || [];
       const tagStats = useMemo(() => {
         const map = new Map();
@@ -325,13 +467,21 @@
         return dedupe([...pinnedTags, ...top]).slice(0, 24);
       }, [pinnedTags, tagStats]);
 
+      // auto tags from content/title
+      const autoTags = useMemo(() => {
+        if (!selectedPrompt) return [];
+        const t = selectedPrompt.title || "";
+        const c = selectedPrompt.content || "";
+        return extractTagCandidates(t, c);
+      }, [selectedPrompt?.title, selectedPrompt?.content]);
+
+      // filtering
       const filteredPrompts = useMemo(() => {
         const q = safeLower(searchQuery.trim());
         return prompts.filter(p => {
           const folderOk = activeFolderId === "all" || p.folderId === activeFolderId;
           if (!folderOk) return false;
           if (starOnly && !p.starred) return false;
-
           if (!q) return true;
           const title = safeLower(p.title);
           const content = safeLower(p.content);
@@ -372,21 +522,7 @@
         };
         setSelectedPrompt(p);
         setTagsInput("");
-      };
-
-      const saveCurrentPrompt = () => {
-        if (!selectedPrompt) return;
-        const tags = normalizeTags(tagsInput);
-        const payload = { ...selectedPrompt, tags, updatedAt: nowISO() };
-
-        const exists = prompts.some(p => p.id === payload.id);
-        const nextPrompts = exists
-          ? prompts.map(p => p.id === payload.id ? payload : p)
-          : [payload, ...prompts];
-
-        setLib({ ...lib, prompts: nextPrompts });
-        setSelectedPrompt(payload);
-        toast("保存しました");
+        setFormFields(prev => ({ ...prev, keyword:"", source:"" }));
       };
 
       const deletePrompt = (id) => {
@@ -414,32 +550,131 @@
         setTagsInput(curr.filter(t => t !== tag).join(", "));
       };
 
-      // ===== Generator =====
+      // ===== Similarity detection on save =====
+      const detectSimilar = (payload) => {
+        const baseText = `${payload.title || ""}\n${payload.content || ""}`;
+        const A = ngrams(baseText, 3, 1200);
+        const matches = [];
+        for (const p of prompts) {
+          if (p.id === payload.id) continue;
+          const txt = `${p.title || ""}\n${p.content || ""}`;
+          const B = ngrams(txt, 3, 1200);
+          const sim = jaccard(A, B);
+          matches.push({ id: p.id, title: p.title || "無題のプロンプト", sim });
+        }
+        matches.sort((a,b)=> b.sim - a.sim);
+        const th = Number(state.settings?.similarityThreshold ?? 0.72);
+        return matches.filter(m => m.sim >= th).slice(0, 6);
+      };
+
+      const commitSave = (payload) => {
+        const exists = prompts.some(p => p.id === payload.id);
+        const nextPrompts = exists
+          ? prompts.map(p => p.id === payload.id ? payload : p)
+          : [payload, ...prompts];
+        setLib({ ...lib, prompts: nextPrompts });
+        setSelectedPrompt(payload);
+        toast("保存しました");
+      };
+
+      const saveCurrentPrompt = (force=false) => {
+        if (!selectedPrompt) return;
+        const tags = normalizeTags(tagsInput);
+        const payload = { ...selectedPrompt, tags, updatedAt: nowISO() };
+
+        if (!force) {
+          const matches = detectSimilar(payload);
+          if (matches.length) {
+            setPendingSave(payload);
+            setSimilarMatches(matches);
+            setSimilarOpen(true);
+            return;
+          }
+        }
+        commitSave(payload);
+      };
+
+      // ===== Generator / Builder =====
       const template = templates.find(t => t.id === templateId) || templates[0];
+
+      const setEnabledKeysForTpl = (nextKeys) => {
+        setState(prev => ({
+          ...prev,
+          settings: {
+            ...(prev.settings || {}),
+            formEnabledByTpl: {
+              ...((prev.settings && prev.settings.formEnabledByTpl) || {}),
+              [templateId]: nextKeys
+            }
+          }
+        }));
+      };
+
+      const toggleFieldEnabled = (key) => {
+        const set = new Set(enabledKeys);
+        if (set.has(key)) set.delete(key); else set.add(key);
+        setEnabledKeysForTpl(Array.from(set));
+      };
+
+      const buildFromFormIntoEditor = () => {
+        const txt = localGenerate({ template, fields: formFields, enabledKeys });
+        // If title empty, set a decent title
+        const kw = (formFields.keyword || keyword || "").trim();
+        setSelectedPrompt(prev => {
+          const p = prev || {
+            id: uid("p"),
+            title: "",
+            content: "",
+            folderId: activeFolderId !== "all" ? activeFolderId : "",
+            tags: [],
+            starred: false,
+            createdAt: nowISO(),
+            updatedAt: nowISO()
+          };
+          return {
+            ...p,
+            title: p.title || (kw ? `${kw}のプロンプト` : "無題のプロンプト"),
+            content: txt
+          };
+        });
+        toast("フォームで組み立てました");
+      };
 
       const generatePrompt = async () => {
         const kw = keyword.trim();
         if (!kw) return;
 
+        // sync form keyword
+        setFormFields(prev => ({ ...prev, keyword: prev.keyword || kw }));
+
         setIsGenerating(true);
         try {
           let generatedText = "";
 
-          // (A) Local (no API)
           if ((state.settings?.genProvider || "local") === "local") {
-            generatedText = localGenerate({ keyword: kw, template, fields: genFields });
+            generatedText = localGenerate({
+              template,
+              fields: { ...formFields, keyword: kw },
+              enabledKeys
+            });
           } else {
-            // (B) Gemini API (optional)
             const key = (state.settings?.geminiKey || "").trim();
             const model = (state.settings?.geminiModel || "gemini-2.5-flash").trim();
             if (!key) {
-              generatedText = localGenerate({ keyword: kw, template, fields: genFields });
+              generatedText = localGenerate({
+                template,
+                fields: { ...formFields, keyword: kw },
+                enabledKeys
+              });
               toast("Geminiキー未設定のためローカル生成に切替");
             } else {
               const systemPrompt =
                 "あなたはプロンプトエンジニアリングのエキスパートです。ユーザーの目的を深く理解し、最高の結果を引き出すための「System Instruction」と「User Prompt」を含んだ構造的なプロンプトを、日本語で作成してください。";
-              const userQuery =
-                `キーワード: "${kw}"\n目的: ${genFields.goal || ""}\n読み手: ${genFields.audience || ""}\n条件: ${genFields.constraints || ""}\n出力形式: ${genFields.format || ""}\n注意: ${genFields.notes || ""}\n素材: ${genFields.source || ""}`;
+              const userQuery = buildUserPromptFromForm({
+                template,
+                fields: { ...formFields, keyword: kw },
+                enabledKeys
+              });
 
               const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
               const res = await fetch(url, {
@@ -456,7 +691,6 @@
             }
           }
 
-          // set selected prompt (unsaved)
           setSelectedPrompt({
             id: uid("p"),
             title: `${kw}のプロンプト`,
@@ -469,6 +703,7 @@
           });
           setTagsInput("");
           setKeyword("");
+          toast("生成しました");
         } catch (e) {
           console.error(e);
           toast("生成中にエラー");
@@ -487,9 +722,8 @@
         try {
           const txt = await file.text();
           const obj = JSON.parse(txt);
-          // minimal validate
           if (!obj || typeof obj !== "object") throw new Error("bad");
-          // merge (id collision: keep both by re-id)
+
           const mergeArr = (a, b, prefix) => {
             const map = new Map((a||[]).map(x => [x.id, x]));
             (b||[]).forEach(it => {
@@ -503,7 +737,6 @@
 
           const cur = state;
           const inc = obj;
-
           const out = JSON.parse(JSON.stringify(cur));
 
           out.personal = out.personal || { folders:[], prompts:[] };
@@ -523,10 +756,11 @@
           out.settings = out.settings || {};
           if (inc.settings?.pinnedTags) out.settings.pinnedTags = dedupe([...(out.settings.pinnedTags||[]), ...inc.settings.pinnedTags]);
 
-          // provider settings merge (prefer current unless empty)
           if (!out.settings.genProvider) out.settings.genProvider = inc.settings?.genProvider || "local";
           if (!out.settings.geminiModel) out.settings.geminiModel = inc.settings?.geminiModel || "gemini-2.5-flash";
           if (!out.settings.geminiKey) out.settings.geminiKey = inc.settings?.geminiKey || "";
+          if (!out.settings.similarityThreshold) out.settings.similarityThreshold = inc.settings?.similarityThreshold ?? 0.72;
+          if (!out.settings.formEnabledByTpl) out.settings.formEnabledByTpl = inc.settings?.formEnabledByTpl || {};
 
           setState(out);
           toast("読み込み（統合）しました");
@@ -545,6 +779,7 @@
           desc: "",
           system: "あなたはプロンプトエンジニアです。",
           user: "キーワード: {{keyword}}\n目的: {{goal}}\n条件: {{constraints}}\n出力形式: {{format}}\n注意: {{notes}}",
+          form: { enabledKeys: ["keyword","goal","constraints","format","notes","source"], order: DEFAULT_TEMPLATES[0].form.order }
         };
         setState(prev => ({ ...prev, templates: [t, ...(prev.templates||[])] }));
         setTemplateId(t.id);
@@ -556,14 +791,12 @@
         if (!t) return;
         const name = prompt("テンプレ名:", t.name || "");
         if (!name || !name.trim()) return;
-
         const desc = prompt("説明（任意）:", t.desc || "") ?? t.desc;
         const system = prompt("System（短め推奨）:", t.system || "") ?? t.system;
-        const user = prompt("User（{{keyword}}など使えます）:", t.user || "") ?? t.user;
 
         setState(prev => ({
           ...prev,
-          templates: (prev.templates||[]).map(x => x.id === id ? { ...x, name: name.trim(), desc: desc||"", system: system||"", user: user||"" } : x)
+          templates: (prev.templates||[]).map(x => x.id === id ? { ...x, name: name.trim(), desc: desc||"", system: system||"" } : x)
         }));
         toast("テンプレ更新");
       };
@@ -586,7 +819,9 @@
             pinnedTags: ["保護者","職員","学級通信","研修","危機管理","ICT","通知文"],
             genProvider: "local",
             geminiKey: "",
-            geminiModel: "gemini-2.5-flash"
+            geminiModel: "gemini-2.5-flash",
+            similarityThreshold: 0.72,
+            formEnabledByTpl: {}
           }
         };
         setState(fresh);
@@ -598,7 +833,296 @@
         toast("初期化しました");
       };
 
-      // ===== UI =====
+      // ===== UI components for form fields =====
+      const FieldInput = ({ k }) => {
+        const meta = FIELD_META[k];
+        if (!meta) return null;
+        const v = formFields[k] || "";
+        if (meta.type === "select") {
+          return (
+            <select
+              className="w-full p-2 rounded-xl border border-slate-200 bg-white text-sm outline-none"
+              value={v}
+              onChange={(e)=>setFormFields(prev=>({ ...prev, [k]: e.target.value }))}
+            >
+              {(meta.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          );
+        }
+        if (meta.type === "textarea") {
+          return (
+            <textarea
+              className="w-full p-3 rounded-2xl border border-slate-200 bg-white text-sm font-mono outline-none resize-none"
+              rows="4"
+              value={v}
+              onChange={(e)=>setFormFields(prev=>({ ...prev, [k]: e.target.value }))}
+              placeholder={meta.placeholder || ""}
+            />
+          );
+        }
+        return (
+          <input
+            className="w-full p-2 rounded-xl border border-slate-200 bg-white text-sm outline-none"
+            value={v}
+            onChange={(e)=>setFormFields(prev=>({ ...prev, [k]: e.target.value }))}
+            placeholder={meta.placeholder || ""}
+          />
+        );
+      };
+
+      // =========================
+      // Modals
+      // =========================
+      const SettingsModal = (
+        <Modal
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          title="設定（ローカル保存 / 生成方式 / 類似判定）"
+          icon={<Ico name="settings" size={20} className="text-indigo-600" />}
+          footer={
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={resetAll}
+                className="px-4 py-2 rounded-2xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-sm font-bold text-rose-700"
+              >
+                全データ初期化
+              </button>
+              <button
+                onClick={() => setSettingsOpen(false)}
+                className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
+              >
+                閉じる
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">タグ候補（固定）</div>
+            <input
+              className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-200"
+              value={(state.settings?.pinnedTags || []).join(", ")}
+              onChange={(e) => {
+                const tags = normalizeTags(e.target.value);
+                setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), pinnedTags: tags } }));
+              }}
+            />
+            <div className="text-xs text-slate-500">固定タグ + 頻出タグ + 本文抽出タグ を候補チップとして表示。</div>
+
+            <div className="pt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">生成方式</div>
+                <select
+                  className="w-full p-3 rounded-2xl border border-slate-200 bg-white outline-none"
+                  value={state.settings?.genProvider || "local"}
+                  onChange={(e) => setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), genProvider: e.target.value } }))}
+                >
+                  <option value="local">ローカル生成（キー不要）</option>
+                  <option value="gemini">Gemini API（キー必要）</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Gemini Model</div>
+                <input
+                  className="w-full p-3 rounded-2xl border border-slate-200 bg-white outline-none"
+                  placeholder="例：gemini-2.5-flash"
+                  value={state.settings?.geminiModel || "gemini-2.5-flash"}
+                  onChange={(e) => setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), geminiModel: e.target.value } }))}
+                />
+              </div>
+
+              <div className="space-y-1 md:col-span-2">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Gemini API Key</div>
+                <input
+                  className="w-full p-3 rounded-2xl border border-slate-200 bg-white outline-none"
+                  placeholder="キーを貼り付け（ローカルに保存されます）"
+                  value={state.settings?.geminiKey || ""}
+                  onChange={(e) => setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), geminiKey: e.target.value } }))}
+                />
+              </div>
+
+              <div className="space-y-1 md:col-span-2 pt-2">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">類似判定しきい値</div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="0.55"
+                    max="0.90"
+                    step="0.01"
+                    value={Number(state.settings?.similarityThreshold ?? 0.72)}
+                    onChange={(e)=> setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), similarityThreshold: Number(e.target.value) } }))}
+                    className="w-full"
+                  />
+                  <div className="text-sm font-bold text-slate-700 w-16 text-right">
+                    {(Number(state.settings?.similarityThreshold ?? 0.72)).toFixed(2)}
+                  </div>
+                </div>
+                <div className="text-[11px] text-slate-500">高いほど「重複」に厳しくなります（おすすめ 0.70〜0.78）。</div>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      );
+
+      const TemplatesModal = (
+        <Modal
+          open={templatesOpen}
+          onClose={() => setTemplatesOpen(false)}
+          title="テンプレ管理（ローカル保管）"
+          icon={<Ico name="layout-template" size={20} className="text-indigo-600" />}
+          footer={
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={addTemplate}
+                className="px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700 flex items-center gap-2"
+              >
+                <Ico name="plus" size={16} />
+                新規テンプレ
+              </button>
+              <button
+                onClick={() => setTemplatesOpen(false)}
+                className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
+              >
+                閉じる
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-1">
+            {templates.map(t => (
+              <div key={t.id} className="bg-white border border-slate-200 rounded-2xl p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-bold text-slate-800 truncate">{t.name}</div>
+                    <div className="text-xs text-slate-500 mt-1 line-clamp-2">{t.desc || "（説明なし）"}</div>
+                    <div className="text-[11px] text-slate-400 mt-2">ID: {t.id}</div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => editTemplate(t.id)} className="p-2 rounded-xl hover:bg-slate-100" title="編集">
+                      <Ico name="pencil" size={16} className="text-slate-600" />
+                    </button>
+                    <button onClick={() => deleteTemplate(t.id)} className="p-2 rounded-xl hover:bg-rose-50" title="削除">
+                      <Ico name="trash-2" size={16} className="text-rose-600" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      );
+
+      const BackupModal = (
+        <Modal
+          open={backupOpen}
+          onClose={() => setBackupOpen(false)}
+          title="バックアップ / 復元（JSON）"
+          icon={<Ico name="database-backup" size={20} className="text-indigo-600" />}
+          footer={
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={exportAll}
+                className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
+              >
+                全データを書き出し
+              </button>
+              <label className="px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700 cursor-pointer">
+                JSONを読み込む
+                <input type="file" accept="application/json" className="hidden"
+                  onChange={(e) => importAll(e.target.files?.[0])}
+                />
+              </label>
+            </div>
+          }
+        >
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-sm text-amber-900">
+            <div className="font-bold">共有（職員で共通のプロンプト庫）について</div>
+            <div className="text-xs text-amber-800 mt-1 leading-relaxed">
+              クラウド無し運用なので、共有は「共有庫に入れる→JSON出力→配布→他端末で読み込み」で実現できます。
+            </div>
+          </div>
+        </Modal>
+      );
+
+      const SimilarModal = (
+        <Modal
+          open={similarOpen}
+          onClose={() => { setSimilarOpen(false); setPendingSave(null); }}
+          title="類似プロンプトが見つかりました（重複防止）"
+          icon={<Ico name="alert-triangle" size={20} className="text-amber-600" />}
+          footer={
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={() => { setSimilarOpen(false); setPendingSave(null); toast("保存をキャンセル"); }}
+                className="px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700"
+              >
+                キャンセル
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    // open the most similar
+                    const top = similarMatches?.[0];
+                    if (top) {
+                      const target = prompts.find(p => p.id === top.id);
+                      if (target) setSelectedPrompt(target);
+                      setSimilarOpen(false);
+                      setPendingSave(null);
+                      toast("類似プロンプトを開きました");
+                    }
+                  }}
+                  className="px-4 py-2 rounded-2xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-sm font-bold text-amber-800"
+                >
+                  一番近いのを開く
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (pendingSave) commitSave(pendingSave);
+                    setSimilarOpen(false);
+                    setPendingSave(null);
+                  }}
+                  className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
+                >
+                  それでも保存
+                </button>
+              </div>
+            </div>
+          }
+        >
+          <div className="text-sm text-slate-700">
+            しきい値以上の類似度が検出されました。重複を避けたい場合は「一番近いのを開く」をおすすめ。
+          </div>
+
+          <div className="space-y-2">
+            {similarMatches.map(m => (
+              <div key={m.id} className="border border-slate-200 rounded-2xl p-4 bg-white flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-bold text-slate-800 truncate">{m.title}</div>
+                  <div className="text-xs text-slate-500 mt-1">類似度：{Math.round(m.sim * 100)}%</div>
+                </div>
+                <button
+                  className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700"
+                  onClick={() => {
+                    const target = prompts.find(p => p.id === m.id);
+                    if (target) setSelectedPrompt(target);
+                    setSimilarOpen(false);
+                    setPendingSave(null);
+                    toast("類似プロンプトを開きました");
+                  }}
+                >
+                  開く
+                </button>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      );
+
+      // =========================
+      // Render
+      // =========================
       return (
         <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
           {/* Toast */}
@@ -609,160 +1133,10 @@
             </div>
           )}
 
-          {/* Settings Modal */}
-          <Modal
-            open={settingsOpen}
-            onClose={() => setSettingsOpen(false)}
-            title="設定（ローカル保存 / 生成方式）"
-            icon={<Ico name="settings" size={20} className="text-indigo-600" />}
-            footer={
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  onClick={resetAll}
-                  className="px-4 py-2 rounded-2xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-sm font-bold text-rose-700"
-                >
-                  全データ初期化
-                </button>
-                <button
-                  onClick={() => setSettingsOpen(false)}
-                  className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
-                >
-                  閉じる
-                </button>
-              </div>
-            }
-          >
-            <div className="space-y-3">
-              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">タグ候補（固定）</div>
-              <input
-                className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-200"
-                value={(state.settings?.pinnedTags || []).join(", ")}
-                onChange={(e) => {
-                  const tags = normalizeTags(e.target.value);
-                  setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), pinnedTags: tags } }));
-                }}
-              />
-              <div className="text-xs text-slate-500">固定タグ + 頻出タグ を候補チップに表示します。</div>
-
-              <div className="pt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">生成方式</div>
-                  <select
-                    className="w-full p-3 rounded-2xl border border-slate-200 bg-white outline-none"
-                    value={state.settings?.genProvider || "local"}
-                    onChange={(e) => setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), genProvider: e.target.value } }))}
-                  >
-                    <option value="local">ローカル生成（キー不要）</option>
-                    <option value="gemini">Gemini API（キー必要）</option>
-                  </select>
-                  <div className="text-[11px] text-slate-500">
-                    生成ボタンが「効かない」を防ぐため、キー無しでもローカル生成で必ず動きます。
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Gemini Model</div>
-                  <input
-                    className="w-full p-3 rounded-2xl border border-slate-200 bg-white outline-none"
-                    placeholder="例：gemini-2.5-flash"
-                    value={state.settings?.geminiModel || "gemini-2.5-flash"}
-                    onChange={(e) => setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), geminiModel: e.target.value } }))}
-                  />
-                </div>
-
-                <div className="space-y-1 md:col-span-2">
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Gemini API Key</div>
-                  <input
-                    className="w-full p-3 rounded-2xl border border-slate-200 bg-white outline-none"
-                    placeholder="キーを貼り付け（ローカルに保存されます）"
-                    value={state.settings?.geminiKey || ""}
-                    onChange={(e) => setState(prev => ({ ...prev, settings: { ...(prev.settings||{}), geminiKey: e.target.value } }))}
-                  />
-                  <div className="text-[11px] text-slate-500">
-                    ※クラウド保存ではなく、この端末のlocalStorageに保存されます（学校端末の運用ルールに従ってください）。
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Modal>
-
-          {/* Templates Modal */}
-          <Modal
-            open={templatesOpen}
-            onClose={() => setTemplatesOpen(false)}
-            title="テンプレ管理（ローカル保管）"
-            icon={<Ico name="layout-template" size={20} className="text-indigo-600" />}
-            footer={
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  onClick={addTemplate}
-                  className="px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700 flex items-center gap-2"
-                >
-                  <Ico name="plus" size={16} />
-                  新規テンプレ
-                </button>
-                <button
-                  onClick={() => setTemplatesOpen(false)}
-                  className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
-                >
-                  閉じる
-                </button>
-              </div>
-            }
-          >
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-1">
-              {templates.map(t => (
-                <div key={t.id} className="bg-white border border-slate-200 rounded-2xl p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-bold text-slate-800 truncate">{t.name}</div>
-                      <div className="text-xs text-slate-500 mt-1 line-clamp-2">{t.desc || "（説明なし）"}</div>
-                      <div className="text-[11px] text-slate-400 mt-2">ID: {t.id}</div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => editTemplate(t.id)} className="p-2 rounded-xl hover:bg-slate-100" title="編集">
-                        <Ico name="pencil" size={16} className="text-slate-600" />
-                      </button>
-                      <button onClick={() => deleteTemplate(t.id)} className="p-2 rounded-xl hover:bg-rose-50" title="削除">
-                        <Ico name="trash-2" size={16} className="text-rose-600" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Modal>
-
-          {/* Backup Modal */}
-          <Modal
-            open={backupOpen}
-            onClose={() => setBackupOpen(false)}
-            title="バックアップ / 復元（JSON）"
-            icon={<Ico name="database-backup" size={20} className="text-indigo-600" />}
-            footer={
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  onClick={exportAll}
-                  className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
-                >
-                  全データを書き出し
-                </button>
-                <label className="px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700 cursor-pointer">
-                  JSONを読み込む
-                  <input type="file" accept="application/json" className="hidden"
-                    onChange={(e) => importAll(e.target.files?.[0])}
-                  />
-                </label>
-              </div>
-            }
-          >
-            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-sm text-amber-900">
-              <div className="font-bold">共有（職員で共通のプロンプト庫）について</div>
-              <div className="text-xs text-amber-800 mt-1 leading-relaxed">
-                クラウド無し運用なので、共有は「共有庫を作る→全データJSON出力→配布→他端末で読み込み」で実現できます。
-              </div>
-            </div>
-          </Modal>
+          {SettingsModal}
+          {TemplatesModal}
+          {BackupModal}
+          {SimilarModal}
 
           {/* Sidebar */}
           <aside className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
@@ -920,7 +1294,7 @@
 
           {/* Editor / Generator Area */}
           <main className="flex-1 flex flex-col bg-white overflow-hidden">
-            {/* Header/Tools（あなたの元レイアウトに戻した） */}
+            {/* Header/Tools */}
             <div className="h-16 border-b border-slate-200 px-6 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-4 flex-1 max-w-2xl">
                 <div className="relative flex-1">
@@ -979,7 +1353,7 @@
                     </button>
 
                     <button
-                      onClick={saveCurrentPrompt}
+                      onClick={() => saveCurrentPrompt(false)}
                       className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-medium transition-colors"
                     >
                       <Ico name="save" size={18} />
@@ -1018,7 +1392,7 @@
                   </div>
 
                   <div className="space-y-2 lg:col-span-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">タグ（候補チップ）</label>
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">タグ（手動）</label>
                     <input
                       className="w-full p-2 bg-slate-50 border border-slate-200 rounded-md text-sm outline-none focus:border-indigo-500"
                       placeholder="例：保護者, 研修, 危機管理..."
@@ -1041,9 +1415,10 @@
                       </div>
                     )}
 
+                    {/* one-click suggestions (fixed/frequent) */}
                     <div className="pt-2">
                       <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                        ワンクリック追加
+                        ワンクリック追加（固定 + 頻出）
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {tagSuggestions.map((t, i) => {
@@ -1065,99 +1440,157 @@
                         })}
                       </div>
                     </div>
+
+                    {/* auto suggestions (from title/content) */}
+                    <div className="pt-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+                          本文から提案（自動抽出）
+                        </div>
+                        <button
+                          onClick={() => {
+                            const curr = normalizeTags(tagsInput);
+                            const next = dedupe([...curr, ...autoTags]).slice(0, 32);
+                            setTagsInput(next.join(", "));
+                            toast("自動提案を追加しました");
+                          }}
+                          className="text-xs font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50"
+                          title="抽出タグをまとめて追加"
+                        >
+                          まとめて追加
+                        </button>
+                      </div>
+
+                      {autoTags.length ? (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {autoTags.map((t, i) => {
+                            const already = normalizeTags(tagsInput).includes(t);
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => addTagChip(t)}
+                                disabled={already}
+                                className={`text-xs font-semibold px-3 py-1 rounded-full border transition-colors ${
+                                  already
+                                    ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                                    : "bg-emerald-50 text-emerald-800 border-emerald-100 hover:bg-emerald-100"
+                                }`}
+                              >
+                                #{t}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-slate-400 mt-2">
+                          タイトル/本文から抽出できる語がまだ少ないかもしれません（本文を増やすと候補が増えます）。
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Generator fields (追加機能：生成の質を上げる) */}
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-3">
+                {/* Template Form Builder */}
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-4">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="font-bold text-slate-700">生成補助（任意）</div>
-                    <button
-                      onClick={() => setGenFields({ audience:"保護者", goal:"", constraints:"", format:"", notes:"", must:"", ban:"", length:"400字程度", source:"" })}
-                      className="text-xs font-semibold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50"
-                    >
-                      リセット
-                    </button>
+                    <div className="font-bold text-slate-700 flex items-center gap-2">
+                      <Ico name="layout-template" size={18} className="text-indigo-600" />
+                      テンプレフォーム（項目を選んで組み立て）
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={buildFromFormIntoEditor}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold"
+                      >
+                        フォームで組み立て
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFormFields({
+                            keyword: "",
+                            audience: "保護者",
+                            goal: "",
+                            constraints: "",
+                            format: "",
+                            must: "",
+                            ban: "",
+                            length: "400字程度",
+                            notes: "",
+                            source: ""
+                          });
+                          toast("フォームをリセット");
+                        }}
+                        className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700"
+                      >
+                        リセット
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">読み手</div>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 items-end">
+                    <div className="lg:col-span-1 space-y-1">
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">テンプレ</div>
                       <select
-                        className="w-full p-2 rounded-xl border border-slate-200 bg-white text-sm outline-none"
-                        value={genFields.audience}
-                        onChange={(e)=>setGenFields(prev=>({ ...prev, audience:e.target.value }))}
+                        className="w-full p-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold outline-none"
+                        value={templateId}
+                        onChange={(e)=>setTemplateId(e.target.value)}
                       >
-                        <option>保護者</option>
-                        <option>職員</option>
-                        <option>児童</option>
-                        <option>地域・外部団体</option>
+                        {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
+                      <div className="text-[11px] text-slate-500">{template?.desc || ""}</div>
                     </div>
 
-                    <div className="space-y-1">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">目的</div>
-                      <input
-                        className="w-full p-2 rounded-xl border border-slate-200 bg-white text-sm outline-none"
-                        value={genFields.goal}
-                        onChange={(e)=>setGenFields(prev=>({ ...prev, goal:e.target.value }))}
-                        placeholder="例：誤解なく持ち物を伝える"
-                      />
+                    <div className="lg:col-span-2 space-y-1">
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">含める項目（クリックでON/OFF）</div>
+                      <div className="flex flex-wrap gap-2">
+                        {(template?.form?.order || Object.keys(FIELD_META)).map((k) => {
+                          const meta = FIELD_META[k];
+                          if (!meta) return null;
+                          const on = new Set(enabledKeys).has(k);
+                          return (
+                            <button
+                              key={k}
+                              onClick={() => toggleFieldEnabled(k)}
+                              className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-colors ${
+                                on ? "bg-indigo-50 text-indigo-700 border-indigo-100 hover:bg-indigo-100" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                              }`}
+                              title="クリックで切替"
+                            >
+                              {on ? "✓ " : ""}{meta.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+                  </div>
 
-                    <div className="space-y-1">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">条件</div>
-                      <input
-                        className="w-full p-2 rounded-xl border border-slate-200 bg-white text-sm outline-none"
-                        value={genFields.constraints}
-                        onChange={(e)=>setGenFields(prev=>({ ...prev, constraints:e.target.value }))}
-                        placeholder="例：やさしい/要点先出し/丁寧"
-                      />
-                    </div>
+                  {/* Form inputs */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                    {(template?.form?.order || Object.keys(FIELD_META)).map((k) => {
+                      const meta = FIELD_META[k];
+                      if (!meta) return null;
+                      const on = new Set(enabledKeys).has(k);
+                      return (
+                        <div key={k} className={`space-y-1 ${meta.type==="textarea" ? "lg:col-span-2" : ""} ${on ? "" : "opacity-50"}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">{meta.label}</div>
+                            {!on && <div className="text-[11px] text-slate-400">（OFF）</div>}
+                          </div>
+                          <div className={`${on ? "" : "pointer-events-none"}`}>
+                            <FieldInput k={k} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
 
-                    <div className="space-y-1">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">出力形式</div>
-                      <input
-                        className="w-full p-2 rounded-xl border border-slate-200 bg-white text-sm outline-none"
-                        value={genFields.format}
-                        onChange={(e)=>setGenFields(prev=>({ ...prev, format:e.target.value }))}
-                        placeholder="例：見出し→本文→箇条書き→締め"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">必ず入れる</div>
-                      <input
-                        className="w-full p-2 rounded-xl border border-slate-200 bg-white text-sm outline-none"
-                        value={genFields.must}
-                        onChange={(e)=>setGenFields(prev=>({ ...prev, must:e.target.value }))}
-                        placeholder="例：日時/場所/締切/持ち物"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">禁止</div>
-                      <input
-                        className="w-full p-2 rounded-xl border border-slate-200 bg-white text-sm outline-none"
-                        value={genFields.ban}
-                        onChange={(e)=>setGenFields(prev=>({ ...prev, ban:e.target.value }))}
-                        placeholder="例：個人情報/断定/強い言い切り"
-                      />
-                    </div>
-
-                    <div className="space-y-1 lg:col-span-2">
-                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">素材（任意）</div>
-                      <textarea
-                        className="w-full p-3 rounded-2xl border border-slate-200 bg-white text-sm font-mono outline-none resize-none"
-                        rows="4"
-                        value={genFields.source}
-                        onChange={(e)=>setGenFields(prev=>({ ...prev, source:e.target.value }))}
-                        placeholder="下書きやメモを貼る（なくてもOK）"
-                      />
-                    </div>
+                  <div className="text-[11px] text-slate-500 leading-relaxed">
+                    ※「生成」ボタンは、フォーム内容を元に（ローカル or Gemini）で文章生成。<br/>
+                    ※「フォームで組み立て」は、AI無しでも System/User を即構成してエディタへ反映します。
                   </div>
                 </div>
 
+                {/* Prompt Content */}
                 <div className="flex-1 flex flex-col space-y-2 min-h-[420px]">
                   <label className="text-xs font-bold text-slate-400 uppercase tracking-widest">プロンプト内容</label>
                   <textarea
@@ -1177,16 +1610,26 @@
                     削除
                   </button>
 
-                  <button
-                    onClick={async () => {
-                      const ok = await tryCopy(selectedPrompt.content || "");
-                      toast(ok ? "コピーしました" : "コピー失敗");
-                    }}
-                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-2"
-                  >
-                    <Ico name="copy" size={16} />
-                    内容コピー
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        const ok = await tryCopy(selectedPrompt.content || "");
+                        toast(ok ? "コピーしました" : "コピー失敗");
+                      }}
+                      className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center gap-2"
+                    >
+                      <Ico name="copy" size={16} />
+                      内容コピー
+                    </button>
+
+                    <button
+                      onClick={() => saveCurrentPrompt(false)}
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold flex items-center gap-2"
+                    >
+                      <Ico name="save" size={16} />
+                      保存（重複チェック付）
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1195,10 +1638,10 @@
                   <Ico name="wand-2" size={32} />
                 </div>
                 <div className="text-center">
-                  <h2 className="text-slate-600 font-semibold">プロンプト作成（復活）</h2>
+                  <h2 className="text-slate-600 font-semibold">プロンプト作成</h2>
                   <p className="text-sm max-w-xs mx-auto mt-2">
                     上の入力欄にキーワードを入れて「杖」ボタンで生成。<br/>
-                    右上の「保存」で保管できます。
+                    あるいは「新規作成」→フォームで組み立ても可能。
                   </p>
                 </div>
               </div>
