@@ -244,70 +244,73 @@
     #cloud-pill, #auth-pill { white-space: nowrap; flex-shrink: 0; }
 
     /* =========================
-       ★見出しレイアウト（指定どおり）
-       - PC：1行（レイアウトは崩さず／タイトル左・日付右）
-       - タブレット：1行目（日付+タイトル）/ 2行目（☁/👤/全画面 + タブ）
-       - スマホ縦：1行目（タイトル）/ 2行目（日付）/ 3行目（☁/👤/全画面）/ 4行目（タブ）
-       - スマホ横：1行目（日付+タイトル）/ 2行目（☁/👤/全画面 + タブ）
+       ★指示どおり：見出し（ヘッダー）の行レイアウトを端末別に制御
+       - 全端末共通：左=タイトル、右=日付
+       - PC：1行（レイアウト崩しなし）
+       - タブレット：1行目=タイトル+日付 / 2行目=ピル+全画面 + タブ
+       - スマホ縦：1=タイトル / 2=日付 / 3=ピル+全画面 / 4=タブ
+       - スマホ横：1行目=タイトル+日付 / 2行目=ピル+全画面 + タブ
     ========================= */
-    .header-grid{
+    .hdr-grid{
       display:grid;
-      grid-template-columns: 1fr;
-      grid-template-areas:
-        "title"
-        "date"
-        "status"
-        "nav";
-      gap: .5rem;
+      gap:.5rem;
       align-items:center;
     }
-    .header-title{ grid-area:title; min-width:0; }
-    .header-date{ grid-area:date; justify-self:start; }
-    .header-status{ grid-area:status; justify-self:start; display:flex; align-items:center; gap:.5rem; }
-    .header-nav{ grid-area:nav; justify-self:start; }
+    .hdr-title{ grid-area:title; min-width:0; }
+    .hdr-date{ grid-area:date; }
+    .hdr-status{ grid-area:status; }
+    .hdr-tabs{ grid-area:tabs; min-width:0; }
 
-    /* タブレット（md） */
-    @media (min-width:768px) and (max-width:1023.98px){
-      .header-grid{
-        grid-template-columns:auto 1fr;
-        grid-template-areas:
-          "date title"
-          "status nav";
-        align-items:center;
+    /* PC（lg以上）：1行。※ここを基本形にして「PCは1行」を担保 */
+    @media (min-width: 1024px){
+      .hdr-grid{
+        grid-template-columns: minmax(260px, 1fr) minmax(280px, 1fr) auto auto;
+        grid-template-areas: "title tabs status date";
       }
-      .header-date{ justify-self:start; }
-      .header-title{ justify-self:start; }
-      .header-status{ justify-self:start; }
-      .header-nav{ justify-self:end; }
+      .hdr-tabs .tabs-wrap{
+        overflow-x:auto;
+        white-space:nowrap;
+      }
     }
 
-    /* スマホ横 */
-    @media (max-width:767.98px) and (orientation:landscape){
-      .header-grid{
-        grid-template-columns:auto 1fr;
+    /* タブレット（sm〜lg未満）：2行 */
+    @media (min-width: 640px) and (max-width: 1023px){
+      .hdr-grid{
+        grid-template-columns: 1fr auto;
         grid-template-areas:
-          "date title"
-          "status nav";
-        align-items:center;
+          "title date"
+          "status tabs";
       }
-      .header-date{ justify-self:start; }
-      .header-title{ justify-self:start; }
-      .header-status{ justify-self:start; }
-      .header-nav{ justify-self:end; }
+      .hdr-tabs .tabs-wrap{
+        overflow-x:auto;
+        white-space:nowrap;
+      }
     }
 
-    /* PC（lg以上）：1行（タイトル左、日付右） */
-    @media (min-width:1024px){
-      .header-grid{
-        grid-template-columns: 1fr auto auto auto;
-        grid-template-areas: "title status nav date";
-        gap: .5rem;
-        align-items:center;
+    /* スマホ（sm未満）：縦は4行 */
+    @media (max-width: 639px){
+      .hdr-grid{
+        grid-template-columns: 1fr;
+        grid-template-areas:
+          "title"
+          "date"
+          "status"
+          "tabs";
       }
-      .header-title{ justify-self:start; }
-      .header-status{ justify-self:end; }
-      .header-nav{ justify-self:end; }
-      .header-date{ justify-self:end; }
+      .hdr-tabs .tabs-wrap{
+        overflow-x:auto;
+        white-space:nowrap;
+      }
+    }
+
+    /* スマホ横（sm未満 + landscape）：2行（1=タイトル+日付 / 2=ピル+全画面+タブ） */
+    @media (max-width: 639px) and (orientation: landscape){
+      .hdr-grid{
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+          "title date"
+          "status tabs";
+      }
     }
   </style>
 
@@ -383,30 +386,32 @@
     </div>
   </div>
 
-  <!-- ★差し替え済みヘッダー：指定どおりの改行ルール／PCは1行固定 -->
+  <!-- ★指示どおり：ヘッダー（タイトル左／日付右 ＋ 端末別に行レイアウト制御） -->
   <header class="no-print sticky top-0 z-40 bg-white/75 backdrop-blur-md border-b border-slate-200">
     <div class="max-w-[1400px] mx-auto px-3 py-2">
-      <div class="header-grid">
-        <!-- タイトル（全端末共通：タイトルは“先”に） -->
-        <div class="header-title flex items-center gap-2">
-          <div class="w-10 h-10 rounded-2xl bg-blue-600 shadow-lg shadow-blue-100 grid place-items-center shrink-0">
-            <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
-                d="M4 17V7a2 2 0 0 1 2-2h9.5a2 2 0 0 1 1.4.6L20 8.7a2 2 0 0 1 .6 1.4V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
-              <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M4 10h16"/>
-            </svg>
-          </div>
-
-          <div class="min-w-0 leading-tight">
-            <div class="text-base md:text-lg font-black tracking-tight truncate">
-              大多喜小学校 スクールバス乗車確認
+      <div class="hdr-grid">
+        <!-- タイトル（左） -->
+        <div class="hdr-title">
+          <div class="flex items-center gap-2 min-w-0">
+            <div class="w-10 h-10 rounded-2xl bg-blue-600 shadow-lg shadow-blue-100 grid place-items-center shrink-0">
+              <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                  d="M4 17V7a2 2 0 0 1 2-2h9.5a2 2 0 0 1 1.4.6L20 8.7a2 2 0 0 1 .6 1.4V17a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
+                <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M4 10h16"/>
+              </svg>
             </div>
-            <div class="text-[11px] font-bold text-slate-400 truncate">©2026 Takayuki WAYAMA</div>
+
+            <div class="min-w-0 leading-tight">
+              <div class="text-base md:text-lg font-black tracking-tight truncate">
+                大多喜小学校 スクールバス乗車確認
+              </div>
+              <div class="text-[11px] font-bold text-slate-400 truncate">©2026 Takayuki WAYAMA</div>
+            </div>
           </div>
         </div>
 
-        <!-- 日付（全端末共通：日付は“後”に。PCでは右端） -->
-        <div class="header-date shrink-0">
+        <!-- 日付（右） -->
+        <div class="hdr-date justify-self-end">
           <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200">
             <button id="btn-prev-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="前日">◀</button>
             <input id="date-picker" type="date" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-blue-500" />
@@ -414,16 +419,18 @@
           </div>
         </div>
 
-        <!-- ☁/👤/全画面（タブレットは2行目、スマホ縦は3行目） -->
-        <div class="header-status shrink-0">
-          <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">☁ 未接続</div>
-          <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">👤 未ログイン</div>
-          <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black whitespace-nowrap">全画面</button>
+        <!-- ピル＋全画面（スマホ縦：3行目 / タブレット：2行目 / スマホ横：2行目 / PC：1行目） -->
+        <div class="hdr-status">
+          <div class="flex items-center gap-2 flex-wrap">
+            <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">☁ 未接続</div>
+            <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">👤 未ログイン</div>
+            <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black whitespace-nowrap">全画面</button>
+          </div>
         </div>
 
-        <!-- タブ（タブレットは2行目、スマホ縦は4行目、スマホ横は2行目、PCは1行） -->
-        <nav class="header-nav">
-          <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap overflow-x-auto">
+        <!-- タブ（スマホ縦：4行目 / タブレット：2行目 / スマホ横：2行目 / PC：1行目） -->
+        <nav class="hdr-tabs">
+          <div class="tabs-wrap flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap overflow-x-auto">
             <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
             <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
             <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-print" onclick="UI.switchTab('print')">印刷</button>
