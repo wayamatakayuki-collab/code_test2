@@ -20,199 +20,197 @@
     @page{ size:A4 portrait; margin:7mm; }
 
     @media print{
-  .no-print{ display:none !important; }
+      .no-print{ display:none !important; }
 
-  /* =========================
-     ★Edge白紙ページ対策（追加）
-     1) body の min-h-screen(=min-height:100vh) を印刷では無効化
-     2) section-print の space-y-* が display:none でも余白を作るのを無効化
-     3) fixed系（オーバーレイ/トースト/モーダル）を完全排除
-  ========================= */
-  html, body{
-    height:auto !important;
-    min-height:auto !important;
-  }
+      /* =========================
+         ★Edge白紙ページ対策（追加）
+         1) body の min-h-screen(=min-height:100vh) を印刷では無効化
+         2) section-print の space-y-* が display:none でも余白を作るのを無効化
+         3) fixed系（オーバーレイ/トースト/モーダル）を完全排除
+      ========================= */
+      html, body{
+        height:auto !important;
+        min-height:auto !important;
+      }
 
-  #section-print{
-    padding:0 !important;
-    margin:0 !important;
-  }
-  /* Tailwindのspace-y-*対策（display:noneでもmarginが残ることがある） */
-  #section-print > :not([hidden]) ~ :not([hidden]){
-    margin-top:0 !important;
-  }
+      #section-print{
+        padding:0 !important;
+        margin:0 !important;
+      }
+      /* Tailwindのspace-y-*対策（display:noneでもmarginが残ることがある） */
+      #section-print > :not([hidden]) ~ :not([hidden]){
+        margin-top:0 !important;
+      }
 
-  #login-overlay, #cloud-error-overlay, #modal,
-  #toast, #toast *{
-    display:none !important;
-  }
+      #login-overlay, #cloud-error-overlay, #modal,
+      #toast, #toast *{
+        display:none !important;
+      }
 
-  /* 印刷時は印刷コンテンツだけ表示 */
-  header,
-  #section-overview,
-  #section-check,
-  #section-monitor,
-  #section-settings{
-    display:none !important;
-  }
+      /* 印刷時は印刷コンテンツだけ表示 */
+      header,
+      #section-overview,
+      #section-check,
+      #section-monitor,
+      #section-settings{
+        display:none !important;
+      }
 
-  /* hidden が付いていても印刷だけは出す（印刷タブの中身） */
-  #section-print{
-    display:block !important;
-  }
+      /* hidden が付いていても印刷だけは出す（印刷タブの中身） */
+      #section-print{
+        display:block !important;
+      }
 
-  body{
-    background:white !important;
-    margin:0 !important;
-    padding:0 !important;
+      body{
+        background:white !important;
+        margin:0 !important;
+        padding:0 !important;
 
-    /* ★Edge白紙対策：100vh系・スクロール系を印刷では解除 */
-    height:auto !important;
-    min-height:auto !important;
-    overflow:visible !important;
+        /* ★Edge白紙対策：100vh系・スクロール系を印刷では解除 */
+        height:auto !important;
+        min-height:auto !important;
+        overflow:visible !important;
 
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
 
-  .print-shell{
-    max-width:100% !important;
-    width:100% !important;
-    padding:0 !important;
-    margin:0 !important;
-  }
+      .print-shell{
+        max-width:100% !important;
+        width:100% !important;
+        padding:0 !important;
+        margin:0 !important;
+      }
 
-  /* プレビュー枠の余白/装飾を落として印刷を綺麗に */
-  #print-content{
-    padding:0 !important;
-    margin:0 !important;
-    border:none !important;
-    box-shadow:none !important;
-    background:transparent !important;
-    overflow:visible !important;
-  }
+      /* プレビュー枠の余白/装飾を落として印刷を綺麗に */
+      #print-content{
+        padding:0 !important;
+        margin:0 !important;
+        border:none !important;
+        box-shadow:none !important;
+        background:transparent !important;
+        overflow:visible !important;
+      }
 
-  /* =========================
-     ★白紙ページ対策（ここが肝）
-     - 末尾の改ページ(after)をやめる
-     - 2枚目以降の「前」で改ページ
-  ========================= */
-  #print-content .print-page{
-    display:block;
-    width:100%;
-    margin:0 !important;
+      /* =========================
+         ★白紙ページ対策（ここが肝）
+         - 末尾の改ページ(after)をやめる
+         - 2枚目以降の「前」で改ページ
+      ========================= */
+      #print-content .print-page{
+        display:block;
+        width:100%;
+        margin:0 !important;
 
-    /* 末尾改ページを禁止（白紙ページ根絶） */
-    page-break-after:auto !important;
-    break-after:auto !important;
+        /* 末尾改ページを禁止（白紙ページ根絶） */
+        page-break-after:auto !important;
+        break-after:auto !important;
 
-    /* 途中分割も抑止 */
-    page-break-inside:avoid !important;
-    break-inside:avoid !important;
-  }
+        /* 途中分割も抑止 */
+        page-break-inside:avoid !important;
+        break-inside:avoid !important;
+      }
 
-  /* 2ページ目以降の前で改ページ */
-  #print-content .print-page + .print-page{
-    page-break-before:always !important;
-    break-before:page !important;
-  }
+      /* 2ページ目以降の前で改ページ */
+      #print-content .print-page + .print-page{
+        page-break-before:always !important;
+        break-before:page !important;
+      }
 
-  /* ★念押し：最後のページの末尾で“強制的に次ページ”を作らせない */
-  #print-content > .print-page:last-child{
-    page-break-after:auto !important;
-    break-after:auto !important;
-  }
+      /* ★念押し：最後のページの末尾で“強制的に次ページ”を作らせない */
+      #print-content > .print-page:last-child{
+        page-break-after:auto !important;
+        break-after:auto !important;
+      }
 
-  /* 以降は既存スタイル（そのまま） */
-  .print-card{ border:2px solid #000 !important; box-shadow:none !important; }
+      /* 以降は既存スタイル（そのまま） */
+      .print-card{ border:2px solid #000 !important; box-shadow:none !important; }
 
-  .print-title{
-    border-bottom:3px solid #000 !important;
-    padding-bottom:2.2mm !important;
-    margin-bottom:2.2mm !important;
-  }
-  .print-title .print-title-en{ font-size:13pt !important; font-weight:900 !important; line-height:1.1 !important; }
-  .print-title .print-title-ja{ font-size:10.5pt !important; font-weight:900 !important; line-height:1.15 !important; }
+      .print-title{
+        border-bottom:3px solid #000 !important;
+        padding-bottom:2.2mm !important;
+        margin-bottom:2.2mm !important;
+      }
+      .print-title .print-title-en{ font-size:13pt !important; font-weight:900 !important; line-height:1.1 !important; }
+      .print-title .print-title-ja{ font-size:10.5pt !important; font-weight:900 !important; line-height:1.15 !important; }
 
-  table{ width:100% !important; border-collapse:collapse !important; table-layout:fixed !important; }
-  th,td{ border:1px solid #000 !important; vertical-align:middle; }
+      table{ width:100% !important; border-collapse:collapse !important; table-layout:fixed !important; }
+      th,td{ border:1px solid #000 !important; vertical-align:middle; }
 
-  .td-name{ font-weight:900 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .td-stop{ white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
-  .td-class{ font-weight:900 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important; text-align:center !important; }
+      .td-name{ font-weight:900 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .td-stop{ white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+      .td-class{ font-weight:900 !important; white-space:nowrap !important; overflow:hidden !important; text-overflow:ellipsis !important; text-align:center !important; }
 
-  .print-bus-card{
-    border:2px solid #000 !important;
-    padding:2.0mm !important;
-    page-break-inside:avoid;
-    break-inside:avoid;
-  }
-  .print-bus-title{
-    font-size:10.5pt !important;
-    font-weight:900 !important;
-    margin:0 0 1.6mm 0 !important;
-    line-height:1.1 !important;
-  }
+      .print-bus-card{
+        border:2px solid #000 !important;
+        padding:2.0mm !important;
+        page-break-inside:avoid;
+        break-inside:avoid;
+      }
+      .print-bus-title{
+        font-size:10.5pt !important;
+        font-weight:900 !important;
+        margin:0 0 1.6mm 0 !important;
+        line-height:1.1 !important;
+      }
 
-  .print-bus-card .td-name,
-  .print-bus-card .td-class{
-    white-space:nowrap !important;
-    overflow:hidden !important;
-    text-overflow:ellipsis !important;
-  }
+      .print-bus-card .td-name,
+      .print-bus-card .td-class{
+        white-space:nowrap !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+      }
 
-  .print-bus-card table th{
-    background:#f3f4f6 !important;
-    font-size:7.0pt !important;
-    padding:1.0mm 1.0mm !important;
-    line-height:1.02 !important;
-  }
-  .print-bus-card table td{
-    font-size:7.4pt !important;
-    padding:1.0mm 1.0mm !important;
-    line-height:1.02 !important;
-  }
-  .print-bus-card table tbody tr{ height:4.05mm; }
+      .print-bus-card table th{
+        background:#f3f4f6 !important;
+        font-size:7.0pt !important;
+        padding:1.0mm 1.0mm !important;
+        line-height:1.02 !important;
+      }
+      .print-bus-card table td{
+        font-size:7.4pt !important;
+        padding:1.0mm 1.0mm !important;
+        line-height:1.02 !important;
+      }
+      .print-bus-card table tbody tr{ height:4.05mm; }
 
-  .print-page.bus-sheet{ padding:2.0mm !important; }
-  .bus-sheet .print-title{
-    padding-bottom:1.6mm !important;
-    margin-bottom:1.6mm !important;
-    border-bottom:3px solid #000 !important;
-  }
-  .bus-sheet .print-title .print-title-en{ font-size:11pt !important; }
-  .bus-sheet .print-title .print-title-ja{ font-size:9.2pt !important; }
+      .print-page.bus-sheet{ padding:2.0mm !important; }
+      .bus-sheet .print-title{
+        padding-bottom:1.6mm !important;
+        margin-bottom:1.6mm !important;
+        border-bottom:3px solid #000 !important;
+      }
+      .bus-sheet .print-title .print-title-en{ font-size:11pt !important; }
+      .bus-sheet .print-title .print-title-ja{ font-size:9.2pt !important; }
 
-  /* ★差し替え：印刷時は grid をやめる（Chrome/Edgeの“最後に白紙ページ”対策） */
-  .print-bus-sheet{ display:block !important; }
-  .print-bus-sheet .print-bus-card{ margin:0 0 2.2mm 0 !important; }
-  .print-bus-sheet .print-bus-card:last-child{ margin-bottom:0 !important; }
+      /* ★差し替え：印刷時は grid をやめる（Chrome/Edgeの“最後に白紙ページ”対策） */
+      .print-bus-sheet{ display:block !important; }
+      .print-bus-sheet .print-bus-card{ margin:0 0 2.2mm 0 !important; }
+      .print-bus-sheet .print-bus-card:last-child{ margin-bottom:0 !important; }
 
-  /* ↓ここから下は“あなたの既存”をそのまま維持（上のgrid指定だけ除去） */
-  .print-bus-sheet .print-bus-card{ padding:1.6mm !important; }
-  .print-bus-sheet .print-bus-title{ font-size:9.2pt !important; margin:0 0 1.2mm 0 !important; }
-  .print-bus-sheet .print-bus-card table th{ font-size:6.0pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
-  .print-bus-sheet .print-bus-card table td{ font-size:6.4pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
-  .print-bus-sheet .print-bus-card table tbody tr{ height:3.45mm; }
+      /* ↓ここから下は“あなたの既存”をそのまま維持（上のgrid指定だけ除去） */
+      .print-bus-sheet .print-bus-card{ padding:1.6mm !important; }
+      .print-bus-sheet .print-bus-title{ font-size:9.2pt !important; margin:0 0 1.2mm 0 !important; }
+      .print-bus-sheet .print-bus-card table th{ font-size:6.0pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
+      .print-bus-sheet .print-bus-card table td{ font-size:6.4pt !important; padding:0.8mm 0.8mm !important; line-height:1.02 !important; }
+      .print-bus-sheet .print-bus-card table tbody tr{ height:3.45mm; }
 
-  .print-class-card{
-    border:2px solid #000 !important;
-    padding:3mm !important;
-    margin-bottom:5mm !important;
-    page-break-inside:avoid;
-    break-inside:avoid;
-  }
-  .print-class-title{
-    font-size:12pt !important;
-    font-weight:900 !important;
-    margin-bottom:2mm !important;
-  }
+      .print-class-card{
+        border:2px solid #000 !important;
+        padding:3mm !important;
+        margin-bottom:5mm !important;
+        page-break-inside:avoid;
+        break-inside:avoid;
+      }
+      .print-class-title{
+        font-size:12pt !important;
+        font-weight:900 !important;
+        margin-bottom:2mm !important;
+      }
 
-  .compact td{ font-size:9pt !important; padding:5px 6px !important; }
-  .compact th{ font-size:8.5pt !important; padding:5px 6px !important; }
-}
-
-
+      .compact td{ font-size:9pt !important; padding:5px 6px !important; }
+      .compact th{ font-size:8.5pt !important; padding:5px 6px !important; }
+    }
 
     .tap{ transition:transform .08s ease, box-shadow .08s ease; }
     .tap:active{ transform:scale(.98); }
@@ -245,10 +243,10 @@
 
     /* =========================
        ★指示どおり：見出し（ヘッダー）の行レイアウトを端末別に制御
-       - 全端末共通：左=タイトル、右=日付
-       - PC：1行（レイアウト崩しなし）
+       ★今回の修正：1行目は「タイトル → 日付」を全端末で統一
+       - PC：1行（title → ... → date）
        - タブレット：1行目=タイトル+日付 / 2行目=ピル+全画面 + タブ
-       - スマホ縦：1=タイトル / 2=日付 / 3=ピル+全画面 / 4=タブ
+       - スマホ縦：1行目=タイトル+日付 / 2行目=ピル+全画面 / 3行目=タブ
        - スマホ横：1行目=タイトル+日付 / 2行目=ピル+全画面 + タブ
     ========================= */
     .hdr-grid{
@@ -273,7 +271,7 @@
       }
     }
 
-    /* タブレット（sm〜lg未満）：2行 */
+    /* タブレット（sm〜lg未満）：2行（1行目：タイトル→日付） */
     @media (min-width: 640px) and (max-width: 1023px){
       .hdr-grid{
         grid-template-columns: 1fr auto;
@@ -287,15 +285,14 @@
       }
     }
 
-    /* スマホ（sm未満）：縦は4行 */
+    /* ★スマホ（sm未満）：縦は「1行目：タイトル→日付」に統一して3行 */
     @media (max-width: 639px){
       .hdr-grid{
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr auto;
         grid-template-areas:
-          "title"
-          "date"
-          "status"
-          "tabs";
+          "title date"
+          "status status"
+          "tabs tabs";
       }
       .hdr-tabs .tabs-wrap{
         overflow-x:auto;
@@ -386,7 +383,7 @@
     </div>
   </div>
 
-  <!-- ★指示どおり：ヘッダー（タイトル左／日付右 ＋ 端末別に行レイアウト制御） -->
+  <!-- ★指示どおり：ヘッダー（1行目：タイトル→日付 を全端末で統一） -->
   <header class="no-print sticky top-0 z-40 bg-white/75 backdrop-blur-md border-b border-slate-200">
     <div class="max-w-[1400px] mx-auto px-3 py-2">
       <div class="hdr-grid">
@@ -419,7 +416,7 @@
           </div>
         </div>
 
-        <!-- ピル＋全画面（スマホ縦：3行目 / タブレット：2行目 / スマホ横：2行目 / PC：1行目） -->
+        <!-- ピル＋全画面 -->
         <div class="hdr-status">
           <div class="flex items-center gap-2 flex-wrap">
             <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">☁ 未接続</div>
@@ -428,7 +425,7 @@
           </div>
         </div>
 
-        <!-- タブ（スマホ縦：4行目 / タブレット：2行目 / スマホ横：2行目 / PC：1行目） -->
+        <!-- タブ -->
         <nav class="hdr-tabs">
           <div class="tabs-wrap flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap overflow-x-auto">
             <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
