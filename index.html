@@ -251,7 +251,7 @@
 </head>
 
 <body class="bg-slate-50 text-slate-800 min-h-screen">
-  <!-- Login Overlay（SchoolCal方式：設定画面なし。ログイン（後）自動でクラウド共有） -->
+  <!-- Login Overlay（SchoolCal方式：設定画面なし。ログイン後、自動でクラウド共有） -->
   <div id="login-overlay" class="fixed inset-0 z-[60] hidden">
     <div class="absolute inset-0 bg-slate-950/60"></div>
     <div class="relative max-w-md mx-auto mt-16 px-4">
@@ -316,12 +316,12 @@
     </div>
   </div>
 
-  <!-- ★ヘッダー：タブレット/スマホは現状維持。PC（lg以上）は「タイトル→日付→ピル→全画面→タブ」を1行固定 -->
+  <!-- ★差し替え済みヘッダー：日付をタイトル左／スマホ・タブレットは2〜3行に折り返しOK -->
   <header class="no-print sticky top-0 z-40 bg-white/75 backdrop-blur-md border-b border-slate-200">
     <div class="max-w-[1400px] mx-auto px-3 py-2">
-      <div class="flex flex-wrap lg:flex-nowrap items-center gap-2">
-        <!-- 日付（※タブレット/スマホは現状のまま先頭。PCは2番目に回す） -->
-        <div class="shrink-0 order-1 lg:order-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- 日付：タイトルの左 -->
+        <div class="shrink-0">
           <div class="flex items-center gap-2 bg-slate-100 rounded-2xl p-2 border border-slate-200">
             <button id="btn-prev-day" class="tap px-3 py-2 rounded-xl bg-white border border-slate-200 shadow-sm text-xs font-black hover:bg-slate-50" title="前日">◀</button>
             <input id="date-picker" type="date" class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm font-black outline-none focus:ring-2 focus:ring-blue-500" />
@@ -329,8 +329,8 @@
           </div>
         </div>
 
-        <!-- タイトル（※タブレット/スマホは現状のまま2番目。PCは先頭に回す） -->
-        <div class="flex items-center gap-2 min-w-[220px] flex-1 order-2 lg:order-1">
+        <!-- タイトル：残り幅を使い、狭いと折り返し -->
+        <div class="flex items-center gap-2 min-w-[220px] flex-1">
           <div class="w-10 h-10 rounded-2xl bg-blue-600 shadow-lg shadow-blue-100 grid place-items-center shrink-0">
             <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
@@ -347,15 +347,15 @@
           </div>
         </div>
 
-        <!-- ☁/👤/全画面（※PCはこの並びのまま、タブの前に固定） -->
-        <div class="shrink-0 flex items-center gap-2 order-3 lg:order-3">
+        <!-- 右：ピル＋全画面（狭いと次行へ） -->
+        <div class="shrink-0 flex items-center gap-2">
           <div id="cloud-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">☁ 未接続</div>
           <div id="auth-pill" class="px-3 py-2 rounded-2xl border text-xs font-black bg-white border-slate-200 text-slate-500 whitespace-nowrap">👤 未ログイン</div>
           <button id="btn-fullscreen" class="tap px-3 py-2 rounded-2xl bg-slate-900 text-white text-xs font-black shadow-lg hover:bg-black whitespace-nowrap">全画面</button>
         </div>
 
-        <!-- タブ（タブレット/スマホは現状どおり次行OK。PC（lg以上）は同一行で右側に続ける） -->
-        <nav class="w-full md:w-auto lg:w-auto order-4 lg:order-4">
+        <!-- タブ：スマホ/タブレットは次の行に落としてOK（横スクロール可） -->
+        <nav class="w-full md:w-auto md:ml-auto">
           <div class="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 flex-nowrap whitespace-nowrap overflow-x-auto">
             <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all tab-active" id="tab-check" onclick="UI.switchTab('check')">担任チェック</button>
             <button class="px-4 py-2 rounded-xl text-xs md:text-sm transition-all text-slate-500" id="tab-monitor" onclick="UI.switchTab('monitor')">全校モニタ</button>
