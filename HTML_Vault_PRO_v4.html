@@ -1,0 +1,1423 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>HTML Vault PRO v4（保存・検索・作成）</title>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React (UMD) -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel (JSX) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Lucide (UMD) -->
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+
+  <!-- CodeMirror 6 (optional; fallback textarea) -->
+  <script type="module">
+    try{
+      const [
+        view, state, commands, langHtml, themeOneDark, language, search, autocomplete
+      ] = await Promise.all([
+        import("https://esm.sh/@codemirror/view"),
+        import("https://esm.sh/@codemirror/state"),
+        import("https://esm.sh/@codemirror/commands"),
+        import("https://esm.sh/@codemirror/lang-html"),
+        import("https://esm.sh/@codemirror/theme-one-dark"),
+        import("https://esm.sh/@codemirror/language"),
+        import("https://esm.sh/@codemirror/search"),
+        import("https://esm.sh/@codemirror/autocomplete"),
+      ]);
+
+      const {EditorView, keymap, highlightSpecialChars, drawSelection, lineNumbers, highlightActiveLineGutter} = view;
+      const {EditorState} = state;
+      const {defaultKeymap, history, historyKeymap, indentWithTab} = commands;
+      const {html} = langHtml;
+      const {oneDark} = themeOneDark;
+      const {syntaxHighlighting, defaultHighlightStyle} = language;
+      const {searchKeymap, highlightSelectionMatches} = search;
+      const {autocompletion, completionKeymap} = autocomplete;
+
+      window.__CM6__ = {
+        EditorView, EditorState, keymap,
+        lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection,
+        defaultKeymap, history, historyKeymap, indentWithTab,
+        html, oneDark,
+        syntaxHighlighting, defaultHighlightStyle,
+        highlightSelectionMatches,
+        searchKeymap,
+        autocompletion, completionKeymap,
+      };
+      window.__CM_OK__ = true;
+      window.dispatchEvent(new Event("cm-ready"));
+    }catch(e){
+      window.__CM_OK__ = false;
+      window.dispatchEvent(new Event("cm-ready"));
+    }
+  </script>
+
+  <style>
+    :root{
+      --bg:#f8fafc;
+      --card:#ffffff;
+      --ink:#0f172a;
+      --muted:#64748b;
+      --line:#e2e8f0;
+      --brand:#4f46e5;
+      --brand2:#4338ca;
+      --ok:#10b981;
+      --warn:#f59e0b;
+      --danger:#ef4444;
+      --radius:22px;
+    }
+    body{ background:var(--bg); -webkit-tap-highlight-color:transparent; }
+    .no-scrollbar::-webkit-scrollbar{ display:none; }
+    .no-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }
+
+    /* Editor */
+    .cm-wrap{ border:1px solid var(--line); border-radius:18px; overflow:hidden; background:#0b1020; }
+    .cm-editor{ height:100%; font-size: 13px; }
+    .cm-scroller{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+    /* Resizable split */
+    .split{
+      display:grid;
+      grid-template-columns: minmax(360px, 1fr) 10px minmax(360px, 1fr);
+      gap: 0;
+      height: 100%;
+      align-items: stretch;
+    }
+    .gutter{
+      background: linear-gradient(to bottom, rgba(15,23,42,.06), rgba(15,23,42,.02));
+      border-left:1px solid var(--line);
+      border-right:1px solid var(--line);
+      cursor: col-resize;
+      position: relative;
+    }
+    .gutter:before{
+      content:"";
+      position:absolute; inset: 0;
+      background-image: radial-gradient(circle, rgba(100,116,139,.55) 1px, transparent 1px);
+      background-size: 10px 10px;
+      opacity:.25;
+    }
+
+    /* Main working area height */
+    .work-h{ height: calc(100vh - 162px); } /* header+controls+footer */
+    @media (max-width: 1023px){
+      .work-h{ height: calc(100vh - 176px); }
+      .split{ grid-template-columns: 1fr; grid-template-rows: 1fr 10px 1fr; }
+      .gutter{ cursor: row-resize; border-left:none; border-right:none; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+    }
+
+    /* Fullscreen overlay */
+    .fs-overlay{ position:fixed; inset:0; z-index:200; background:#000; }
+    .fs-top{ position:absolute; inset:0 0 auto 0; height:56px; background: rgba(0,0,0,.72); backdrop-filter: blur(10px); display:flex; align-items:center; justify-content:space-between; padding: 10px 12px; }
+    .fs-body{ position:absolute; inset:56px 0 0 0; }
+
+    iframe{ background:#fff; }
+
+    @media print{
+      .no-print{ display:none !important; }
+      body{ background:#fff; }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script>
+    window.addEventListener("error", (e) => {
+      const el = document.getElementById("root");
+      if (!el) return;
+      const msg = (e && (e.message || (e.error && e.error.message))) || "Unknown error";
+      el.innerHTML = `
+        <div style="padding:16px;font-family:system-ui;">
+          <div style="font-weight:900;color:#b91c1c;">エラーで画面が描画できませんでした</div>
+          <pre style="white-space:pre-wrap;background:#fff;border:1px solid #fee2e2;padding:12px;border-radius:12px;margin-top:8px;color:#7f1d1d;">${msg}</pre>
+          <div style="margin-top:10px;color:#334155;font-size:12px;">
+            学校回線でCDNがブロックされる場合があります（unpkg / esm.sh）。その場合でもtextareaモードで動作します。
+          </div>
+        </div>`;
+    });
+  </script>
+
+  <script type="text/babel">
+    const {useEffect, useMemo, useRef, useState} = React;
+
+    const LS_KEY = "html_vault_pro_v4";
+    const MAX_ITEMS = 9000;
+    const MAX_TRASH = 9000;
+    const MAX_VERSIONS = 30;
+
+    const nowISO = () => new Date().toISOString();
+    const uid = (p="id") => `${p}_${Math.random().toString(36).slice(2,10)}_${Date.now().toString(36)}`;
+    const safeLower = (s) => (s ?? "").toString().toLowerCase();
+    const dedupe = (arr) => [...new Set((arr||[]).filter(Boolean))];
+    const normalizeTags = (raw) => dedupe((raw||"").split(/[,、\n]/).map(s=>s.trim()).filter(Boolean).slice(0,140));
+    const looksLikeHtml = (s="") => /<!doctype html>|<html[\s>]/i.test(s);
+    const escapeHtml = (s="") => s.replace(/[<>&]/g, ch => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[ch]));
+    const pickTitleFromUrl = (url) => {
+      try{
+        const u = new URL(url);
+        const p = (u.pathname||"/").split("/").filter(Boolean).pop() || u.hostname;
+        return decodeURIComponent(p).replace(/\.(html|htm)$/i,"") || u.hostname;
+      }catch{
+        return "URLメモ";
+      }
+    };
+
+    const safeJsonParse = (raw) => { try{ return JSON.parse(raw); }catch{ return null; } };
+
+    const defaultState = () => ({
+      personal: { folders: [], items: [], trash: [] },
+      shared: { folders: [], items: [], trash: [] },
+      settings: {
+        editorTheme: "dark",
+        safetySandbox: true,
+        livePreview: false,
+        previewAuto: true,
+        pinnedTags: ["校務","研修","連絡","掲示","ツール","HTML","JS","Firebase","Teams","Forms"],
+        layout: {
+          splitPct: 52,
+          splitPctMobile: 52,
+          editorMax: false,
+          previewMax: false
+        }
+      },
+      ui: { lastLibrary: "personal", lastFolderId: "all", lastSearch: "", lastTagFilter: "", lastStarOnly: false }
+    });
+
+    const initState = () => {
+      const s = safeJsonParse(localStorage.getItem(LS_KEY)||"");
+      if(!s) return defaultState();
+      if(!s.personal) s.personal = {folders:[], items:[], trash:[]};
+      if(!s.shared) s.shared = {folders:[], items:[], trash:[]};
+      if(!s.settings) s.settings = defaultState().settings;
+      if(!s.settings.layout) s.settings.layout = defaultState().settings.layout;
+      if(!Array.isArray(s.settings.pinnedTags)) s.settings.pinnedTags = defaultState().settings.pinnedTags;
+      if(!s.ui) s.ui = defaultState().ui;
+      return s;
+    };
+
+    const downloadText = (filename, text, type="text/plain;charset=utf-8") => {
+      const blob = new Blob([text], {type});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    };
+
+    const tryCopy = async (text) => {
+      try{ await navigator.clipboard.writeText(text || ""); return true; }
+      catch{
+        try{
+          const ta = document.createElement("textarea");
+          ta.value = text || "";
+          document.body.appendChild(ta);
+          ta.select(); document.execCommand("copy");
+          ta.remove(); return true;
+        }catch{ return false; }
+      }
+    };
+
+    function simpleFormatHtml(input){
+      try{
+        let s = (input||"").replace(/\r\n/g,"\n");
+        s = s.replace(/></g, ">\n<");
+        s = s.replace(/\n{3,}/g, "\n\n");
+        return s.trim() + "\n";
+      }catch{ return input||""; }
+    }
+
+    const TEMPLATES = [
+      {
+        id:"basic",
+        name:"最小HTML",
+        build:(title="Untitled")=>`<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${title}</title>
+  <style>
+    body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;margin:24px;line-height:1.7}
+    .card{border:1px solid #e5e7eb;border-radius:16px;padding:18px;max-width:920px}
+    .muted{color:#64748b}
+    button{padding:10px 14px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;cursor:pointer}
+    button:hover{background:#f8fafc}
+  </style>
+</head>
+<body>
+  <h1>${title}</h1>
+  <div class="card">
+    <p class="muted">ここに内容</p>
+    <button onclick="alert('OK')">テスト</button>
+  </div>
+</body>
+</html>`
+      },
+      {
+        id:"tailwind",
+        name:"Tailwind簡易アプリ",
+        build:(title="Tailwind App")=>`<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>${title}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50">
+  <div class="max-w-4xl mx-auto p-6 space-y-4">
+    <h1 class="text-2xl font-black text-slate-900">${title}</h1>
+    <div class="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+      <p class="text-slate-700">ここに内容</p>
+      <div class="mt-4 flex gap-2">
+        <button class="px-4 py-2 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-700" id="btn">クリック</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.getElementById('btn').addEventListener('click', ()=> alert('動作OK'));
+  </script>
+</body>
+</html>`
+      }
+    ];
+
+    function Fullscreen({open, title, onClose, children, onOpenNewTab}){
+      useEffect(()=>{
+        if(!open) return;
+        const onKey = (e)=>{ if(e.key==="Escape") onClose?.(); };
+        window.addEventListener("keydown", onKey);
+        return ()=> window.removeEventListener("keydown", onKey);
+      }, [open]);
+      if(!open) return null;
+      return (
+        <div className="fs-overlay">
+          <div className="fs-top">
+            <div className="text-white font-black truncate flex items-center gap-2">
+              <span dangerouslySetInnerHTML={{__html: window.lucide?.icons?.["maximize"]?.toSvg({width:18,height:18,class:"text-white"}) || ""}} />
+              <span className="truncate">{title || "全画面"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {onOpenNewTab && (
+                <button onClick={onOpenNewTab} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-bold">
+                  新規タブ
+                </button>
+              )}
+              <button onClick={onClose} className="px-3 py-2 rounded-xl bg-white text-slate-900 text-sm font-black">閉じる（Esc）</button>
+            </div>
+          </div>
+          <div className="fs-body">
+            {children}
+          </div>
+        </div>
+      );
+    }
+
+    function Editor({value, onChange, theme="dark", onSave, onFormat, onTemplate, heightPx=520}){
+      const hostRef = useRef(null);
+      const viewRef = useRef(null);
+      const lastValRef = useRef(value);
+      const [cmReady, setCmReady] = useState(!!window.__CM_OK__);
+
+      useEffect(()=>{
+        const fn = ()=> setCmReady(!!window.__CM_OK__);
+        window.addEventListener("cm-ready", fn);
+        return ()=> window.removeEventListener("cm-ready", fn);
+      }, []);
+
+      useEffect(()=>{
+        if(!cmReady) return;
+        if(!hostRef.current) return;
+        if(viewRef.current) return;
+        const CM = window.__CM6__;
+        if(!CM) return;
+
+        const extensions = [
+          CM.lineNumbers(),
+          CM.highlightActiveLineGutter(),
+          CM.highlightSpecialChars(),
+          CM.drawSelection(),
+          CM.history(),
+          CM.highlightSelectionMatches(),
+          CM.autocompletion(),
+          CM.keymap.of([
+            CM.indentWithTab,
+            ...CM.defaultKeymap,
+            ...CM.historyKeymap,
+            ...CM.searchKeymap,
+            ...CM.completionKeymap,
+            { key: "Mod-s", run: () => { onSave?.(); return true; } }
+          ]),
+          CM.html()
+        ];
+
+        if(theme==="dark") extensions.push(CM.oneDark);
+        else extensions.push(CM.syntaxHighlighting(CM.defaultHighlightStyle, {fallback:true}));
+
+        const state = CM.EditorState.create({
+          doc: value || "",
+          extensions: [
+            ...extensions,
+            CM.EditorView.updateListener.of((u)=>{
+              if(u.docChanged){
+                const v = u.state.doc.toString();
+                lastValRef.current = v;
+                onChange?.(v);
+              }
+            })
+          ]
+        });
+
+        const view = new CM.EditorView({state, parent: hostRef.current});
+        viewRef.current = view;
+      }, [cmReady]);
+
+      useEffect(()=>{
+        if(!cmReady) return;
+        const view = viewRef.current;
+        if(!view) return;
+        if(value === lastValRef.current) return;
+        view.dispatch({changes:{from:0,to:view.state.doc.length, insert:value||""}});
+        lastValRef.current = value || "";
+      }, [value, cmReady]);
+
+      if(!cmReady){
+        return (
+          <div className="space-y-2 h-full">
+            <textarea
+              className="w-full h-full p-3 rounded-2xl border border-slate-200 bg-white text-sm font-mono outline-none resize-none"
+              value={value||""}
+              onChange={(e)=>onChange?.(e.target.value)}
+              placeholder="HTMLコードを入力（CodeMirrorが使えない環境ではこのモード）"
+              style={{minHeight: heightPx}}
+            />
+            <div className="flex flex-wrap gap-2">
+              <button onClick={onTemplate} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700">テンプレ</button>
+              <button onClick={onFormat} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700">整形</button>
+              <button onClick={onSave} className="px-3 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold">保存</button>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="space-y-2 h-full">
+          <div className="cm-wrap" style={{height: heightPx}}>
+            <div ref={hostRef} style={{height:"100%"}}></div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={onTemplate} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700">テンプレ</button>
+            <button onClick={onFormat} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700">整形</button>
+            <button onClick={onSave} className="px-3 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold">保存</button>
+          </div>
+        </div>
+      );
+    }
+
+    function App(){
+      const [state, setState] = useState(initState);
+
+      const [libraryMode, setLibraryMode] = useState(state.ui?.lastLibrary || "personal");
+      const [activeFolderId, setActiveFolderId] = useState(state.ui?.lastFolderId || "all");
+      const [searchQuery, setSearchQuery] = useState(state.ui?.lastSearch || "");
+      const [tagFilter, setTagFilter] = useState(state.ui?.lastTagFilter || "");
+      const [starOnly, setStarOnly] = useState(!!state.ui?.lastStarOnly);
+      const [showTrash, setShowTrash] = useState(false);
+
+      const [selected, setSelected] = useState(null);
+      const [tagsInput, setTagsInput] = useState("");
+      const [toastObj, setToastObj] = useState(null);
+
+      const [templatesOpen, setTemplatesOpen] = useState(false);
+      const [jsonOpen, setJsonOpen] = useState(false);
+      const [foldersOpen, setFoldersOpen] = useState(false);
+      const [settingsOpen, setSettingsOpen] = useState(false);
+
+      const [fsPreviewOpen, setFsPreviewOpen] = useState(false);
+
+      const previewRef = useRef(null);
+      const dzRef = useRef(null);
+
+      const toastTimer = useRef(null);
+      const toast = (msg) => {
+        if(toastTimer.current) clearTimeout(toastTimer.current);
+        setToastObj({msg});
+        toastTimer.current = setTimeout(()=> setToastObj(null), 2200);
+      };
+
+      const lib = libraryMode==="personal" ? state.personal : state.shared;
+      const folders = lib.folders || [];
+      const items = lib.items || [];
+      const trash = lib.trash || [];
+      const settings = state.settings || defaultState().settings;
+      const layout = settings.layout || defaultState().settings.layout;
+      const pinnedTags = settings.pinnedTags || [];
+
+      const setLib = (nextLib) => {
+        setState(prev => {
+          const out = {...prev};
+          if(libraryMode==="personal") out.personal = nextLib;
+          else out.shared = nextLib;
+          return out;
+        });
+      };
+
+      useEffect(()=>{
+        const t = setTimeout(()=> localStorage.setItem(LS_KEY, JSON.stringify(state)), 200);
+        return ()=> clearTimeout(t);
+      }, [state]);
+
+      useEffect(()=>{
+        setState(prev => ({
+          ...prev,
+          ui: {
+            ...(prev.ui||{}),
+            lastLibrary: libraryMode,
+            lastFolderId: activeFolderId,
+            lastSearch: searchQuery,
+            lastTagFilter: tagFilter,
+            lastStarOnly: starOnly
+          }
+        }));
+      }, [libraryMode, activeFolderId, searchQuery, tagFilter, starOnly]);
+
+      const tagStats = useMemo(()=>{
+        const map = new Map();
+        items.forEach(it => (it.tags||[]).forEach(t=> map.set(t,(map.get(t)||0)+1)));
+        return Array.from(map.entries()).sort((a,b)=>b[1]-a[1]).map(([tag,count])=>({tag,count}));
+      }, [items]);
+
+      const tagSuggestions = useMemo(()=>{
+        const top = tagStats.slice(0, 18).map(x=>x.tag);
+        return dedupe([...(pinnedTags||[]), ...top]).slice(0, 40);
+      }, [pinnedTags, tagStats]);
+
+      const foldersWithAll = useMemo(()=> [{id:"all", name:"すべて"}, ...folders], [folders]);
+
+      const listSource = showTrash ? trash : items;
+      const filteredList = useMemo(()=>{
+        const q = safeLower(searchQuery.trim());
+        const tf = safeLower(tagFilter.trim());
+        return (listSource||[]).filter(it=>{
+          if(!showTrash){
+            if(activeFolderId!=="all" && (it.folderId||"")!==activeFolderId) return false;
+            if(starOnly && !it.starred) return false;
+            if(tf){
+              const ok = (it.tags||[]).some(t=> safeLower(t)===tf);
+              if(!ok) return false;
+            }
+          }
+          if(!q) return true;
+          const title = safeLower(it.title);
+          const url = safeLower(it.url||"");
+          const tags = (it.tags||[]).map(safeLower).join(" ");
+          const code = safeLower((it.code||"").slice(0, 5000));
+          const notes = safeLower((it.notes||"").slice(0, 2500));
+          const fileName = safeLower(it.fileName||"");
+          return title.includes(q) || url.includes(q) || tags.includes(q) || code.includes(q) || notes.includes(q) || fileName.includes(q);
+        }).sort((a,b)=> (b.updatedAt||b.createdAt||"").localeCompare(a.updatedAt||a.createdAt||""));
+      }, [listSource, activeFolderId, starOnly, tagFilter, searchQuery, showTrash]);
+
+      const refreshPreview = (it=selected) => {
+        if(!it) return;
+        const iframe = previewRef.current;
+        if(!iframe) return;
+        if(it.kind==="url"){
+          iframe.removeAttribute("srcdoc");
+          iframe.src = it.url || "about:blank";
+        }else{
+          iframe.src = "about:blank";
+          iframe.srcdoc = it.code || "";
+        }
+      };
+
+      useEffect(()=>{
+        if(!settings.livePreview) return;
+        if(!selected || selected.kind!=="code") return;
+        const t = setTimeout(()=> refreshPreview(selected), 350);
+        return ()=> clearTimeout(t);
+      }, [selected?.code, settings.livePreview]);
+
+      const openItem = (it) => {
+        setSelected(it);
+        setTagsInput((it.tags||[]).join(", "));
+        if(settings.previewAuto) setTimeout(()=> refreshPreview(it), 30);
+      };
+
+      const newCodeItem = (preset="basic") => {
+        const folderId = (activeFolderId!=="all") ? activeFolderId : "";
+        const tmpl = TEMPLATES.find(t=>t.id===preset) || TEMPLATES[0];
+        const title = "新規HTML";
+        const it = {
+          id: uid("h"),
+          kind: "code",
+          title,
+          fileName: "",
+          url: "",
+          code: tmpl.build(title),
+          notes: "",
+          folderId,
+          tags: [],
+          starred: false,
+          versions: [],
+          createdAt: nowISO(),
+          updatedAt: nowISO()
+        };
+        setSelected(it);
+        setTagsInput("");
+        toast("新規（コード）作成（未保存）");
+        setTimeout(()=> refreshPreview(it), 30);
+      };
+
+      const newUrlItem = () => {
+        const folderId = (activeFolderId!=="all") ? activeFolderId : "";
+        const it = {
+          id: uid("u"),
+          kind: "url",
+          title: "URLメモ",
+          fileName: "",
+          url: "",
+          code: "",
+          notes: "",
+          folderId,
+          tags: [],
+          starred: false,
+          versions: [],
+          createdAt: nowISO(),
+          updatedAt: nowISO()
+        };
+        setSelected(it);
+        setTagsInput("");
+        toast("新規（URL）作成（未保存）");
+      };
+
+      const saveSelected = () => {
+        if(!selected) return;
+        const tags = normalizeTags(tagsInput);
+        let payload = {...selected, tags, updatedAt: nowISO()};
+
+        if(payload.kind==="code"){
+          const existing = items.find(x=>x.id===payload.id);
+          if(existing && existing.kind==="code" && existing.code !== payload.code){
+            const v = { at: nowISO(), title: existing.title||"", code: existing.code||"", notes: existing.notes||"" };
+            payload.versions = [v, ...(existing.versions||[])].slice(0, MAX_VERSIONS);
+          }else{
+            payload.versions = payload.versions || existing?.versions || [];
+          }
+        }
+
+        const exists = items.some(x=>x.id===payload.id);
+        const nextItems = exists ? items.map(x=>x.id===payload.id ? payload : x)
+                                : [payload, ...items].slice(0, MAX_ITEMS);
+
+        setLib({...lib, items: nextItems});
+        setSelected(payload);
+        toast("保存しました");
+        if(settings.previewAuto) setTimeout(()=> refreshPreview(payload), 20);
+      };
+
+      const moveToTrash = (id) => {
+        const it = items.find(x=>x.id===id);
+        if(!it) return;
+        setLib({
+          ...lib,
+          items: items.filter(x=>x.id!==id),
+          trash: [{...it, deletedAt: nowISO()}, ...trash].slice(0, MAX_TRASH)
+        });
+        if(selected?.id===id) setSelected(null);
+        toast("ゴミ箱へ移動");
+      };
+
+      const restoreFromTrash = (id) => {
+        const it = trash.find(x=>x.id===id);
+        if(!it) return;
+        const nextTrash = trash.filter(x=>x.id!==id);
+        const restored = {...it};
+        delete restored.deletedAt;
+        restored.updatedAt = nowISO();
+        setLib({...lib, items: [restored, ...items].slice(0, MAX_ITEMS), trash: nextTrash});
+        toast("復元しました");
+      };
+
+      const purgeFromTrash = (id) => {
+        if(!confirm("完全に削除しますか？（戻せません）")) return;
+        setLib({...lib, trash: trash.filter(x=>x.id!==id)});
+        toast("完全削除");
+      };
+
+      const toggleStar = (id) => {
+        const nextItems = items.map(it=> it.id===id ? {...it, starred: !it.starred, updatedAt: nowISO()} : it);
+        setLib({...lib, items: nextItems});
+        if(selected?.id===id) setSelected(nextItems.find(x=>x.id===id));
+      };
+
+      const handleUpload = async (file) => {
+        if(!file) return;
+        const text = await file.text();
+        const folderId = (activeFolderId!=="all") ? activeFolderId : "";
+        const name = file.name || "uploaded.html";
+        const it = {
+          id: uid("h"),
+          kind:"code",
+          title: name.replace(/\.(html|htm)$/i,"") || "アップロードHTML",
+          fileName: name,
+          url:"",
+          code: looksLikeHtml(text) ? text : TEMPLATES[0].build(name).replace("</body>", `<pre>${escapeHtml(text)}</pre>\n</body>`),
+          notes:"",
+          folderId,
+          tags: [],
+          starred:false,
+          versions: [],
+          createdAt: nowISO(),
+          updatedAt: nowISO()
+        };
+        setSelected(it);
+        setTagsInput("");
+        toast("HTML読み込み（未保存）");
+        setTimeout(()=> refreshPreview(it), 30);
+      };
+
+      useEffect(()=>{
+        const dz = dzRef.current;
+        if(!dz) return;
+        const onOver = (e)=>{ e.preventDefault(); dz.dataset.drag="1"; };
+        const onLeave = (e)=>{ e.preventDefault(); dz.dataset.drag=""; };
+        const onDrop = async (e)=>{
+          e.preventDefault(); dz.dataset.drag="";
+          const f = e.dataTransfer?.files?.[0];
+          if(!f) return;
+          if(!/\.html?$/i.test(f.name)){ alert("HTMLファイル（.html/.htm）をドロップしてください"); return; }
+          await handleUpload(f);
+        };
+        dz.addEventListener("dragover", onOver);
+        dz.addEventListener("dragleave", onLeave);
+        dz.addEventListener("drop", onDrop);
+        return ()=>{
+          dz.removeEventListener("dragover", onOver);
+          dz.removeEventListener("dragleave", onLeave);
+          dz.removeEventListener("drop", onDrop);
+        };
+      }, [dzRef.current, activeFolderId]);
+
+      const exportAll = () => downloadText(`HTMLVaultPRO_ALL_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(state, null, 2), "application/json;charset=utf-8");
+      const exportLibrary = () => downloadText(`HTMLVaultPRO_${libraryMode}_LIB_${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(lib, null, 2), "application/json;charset=utf-8");
+
+      const importAll = async (file) => {
+        if(!file) return;
+        try{
+          const obj = JSON.parse(await file.text());
+          setState(obj);
+          setLibraryMode(obj.ui?.lastLibrary || "personal");
+          setActiveFolderId(obj.ui?.lastFolderId || "all");
+          setSelected(null);
+          toast("全体JSONを読み込みました");
+        }catch{
+          alert("JSON読み込みに失敗しました");
+        }
+      };
+
+      const importLibraryOnly = async (file) => {
+        if(!file) return;
+        try{
+          const obj = JSON.parse(await file.text());
+          if(!Array.isArray(obj.items) || !Array.isArray(obj.folders)) throw new Error("not-lib");
+          setLib({folders: obj.folders||[], items: obj.items||[], trash: obj.trash||[]});
+          setSelected(null);
+          toast("庫JSONを読み込み（置換）しました");
+        }catch{
+          alert("庫JSON読み込みに失敗しました");
+        }
+      };
+
+      const exportSelectedAsHtml = () => {
+        if(!selected || selected.kind!=="code") return toast("コード項目のみ");
+        const base = (selected.title || selected.fileName || "untitled").replace(/[\\\/:*?"<>|]/g,"_").slice(0,60);
+        downloadText(`${base}.html`, selected.code || "", "text/html;charset=utf-8");
+        toast("HTMLを書き出しました");
+      };
+
+      const exportSelectedAsTxt = () => {
+        if(!selected) return;
+        const base = (selected.title || "item").replace(/[\\\/:*?"<>|]/g,"_").slice(0,60);
+        const text = selected.kind==="url" ? (selected.url||"") : (selected.code||"");
+        downloadText(`${base}.txt`, text, "text/plain;charset=utf-8");
+        toast("テキストを書き出しました");
+      };
+
+      const createFolder = () => {
+        const name = prompt("新しいフォルダ名:");
+        if(!name || !name.trim()) return;
+        setLib({...lib, folders: [...folders, {id: uid("f"), name: name.trim(), createdAt: nowISO()}]});
+        toast("フォルダ作成");
+      };
+      const renameFolder = (id) => {
+        const f = folders.find(x=>x.id===id); if(!f) return;
+        const name = prompt("フォルダ名を変更:", f.name);
+        if(!name || !name.trim()) return;
+        setLib({...lib, folders: folders.map(x=>x.id===id ? {...x, name: name.trim()} : x)});
+        toast("フォルダ名変更");
+      };
+      const deleteFolder = (id) => {
+        const f = folders.find(x=>x.id===id); if(!f) return;
+        if(!confirm(`フォルダ「${f.name}」を削除しますか？\n※中のデータは「フォルダなし」に移動します。`)) return;
+        setLib({
+          ...lib,
+          folders: folders.filter(x=>x.id!==id),
+          items: items.map(it => (it.folderId||"")===id ? {...it, folderId:""} : it)
+        });
+        if(activeFolderId===id) setActiveFolderId("all");
+        toast("フォルダ削除");
+      };
+
+      const applyTemplate = (tmplId) => {
+        const t = TEMPLATES.find(x=>x.id===tmplId) || TEMPLATES[0];
+        const title = selected?.title || "新規HTML";
+        const code = t.build(title);
+        if(selected && selected.kind==="code" && (selected.code||"").trim()){
+          if(!confirm("テンプレで置換しますか？")) return;
+        }
+        if(selected){
+          const next = {...selected, kind:"code", code, updatedAt: nowISO()};
+          setSelected(next);
+          toast("テンプレ適用（未保存）");
+          setTemplatesOpen(false);
+          setTimeout(()=> refreshPreview(next), 30);
+        }else{
+          newCodeItem(tmplId);
+          setTemplatesOpen(false);
+        }
+      };
+
+      const onFormat = () => {
+        if(!selected || selected.kind!=="code") return;
+        const next = {...selected, code: simpleFormatHtml(selected.code||"")};
+        setSelected(next);
+        toast("整形（未保存）");
+      };
+
+      const containerRef = useRef(null);
+      const draggingRef = useRef(false);
+
+      const startDrag = (e) => {
+        draggingRef.current = true;
+        document.body.style.cursor = window.innerWidth >= 1024 ? "col-resize" : "row-resize";
+        document.body.style.userSelect = "none";
+        e.preventDefault();
+      };
+
+      const stopDrag = () => {
+        if(!draggingRef.current) return;
+        draggingRef.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      };
+
+      useEffect(()=>{
+        const onMove = (e) => {
+          if(!draggingRef.current) return;
+          const el = containerRef.current;
+          if(!el) return;
+          const rect = el.getBoundingClientRect();
+
+          if(window.innerWidth >= 1024){
+            const x = (e.clientX - rect.left);
+            const pct = Math.max(20, Math.min(80, (x / rect.width) * 100));
+            setState(prev => ({
+              ...prev,
+              settings: {
+                ...(prev.settings||{}),
+                layout: { ...(prev.settings?.layout||{}), splitPct: Math.round(pct) }
+              }
+            }));
+          }else{
+            const y = (e.clientY - rect.top);
+            const pct = Math.max(20, Math.min(80, (y / rect.height) * 100));
+            setState(prev => ({
+              ...prev,
+              settings: {
+                ...(prev.settings||{}),
+                layout: { ...(prev.settings?.layout||{}), splitPctMobile: Math.round(pct) }
+              }
+            }));
+          }
+        };
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", stopDrag);
+        window.addEventListener("touchmove", (ev)=>{ if(ev.touches?.[0]) onMove(ev.touches[0]); }, {passive:false});
+        window.addEventListener("touchend", stopDrag);
+        return ()=>{
+          window.removeEventListener("mousemove", onMove);
+          window.removeEventListener("mouseup", stopDrag);
+          window.removeEventListener("touchend", stopDrag);
+        };
+      }, []);
+
+      const splitPct = window.innerWidth >= 1024 ? layout.splitPct : layout.splitPctMobile;
+      const col1 = `${splitPct}%`;
+      const col3 = `${100 - splitPct}%`;
+
+      const editorHeight = Math.max(520, window.innerHeight - 420);
+      const previewHeight = Math.max(520, window.innerHeight - 420);
+
+      useEffect(()=>{
+        if(!selected) return;
+        if(settings.previewAuto) setTimeout(()=> refreshPreview(selected), 20);
+      }, [selected?.id]);
+
+      const LeftPanel = (
+        <div className="bg-white border border-slate-200 rounded-[24px] shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-200 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-black text-slate-800 flex items-center gap-2">
+                <span dangerouslySetInnerHTML={{__html: window.lucide?.icons?.["archive"]?.toSvg({width:18,height:18,class:"text-indigo-600"}) || ""}} />
+                HTMLライブラリ
+              </div>
+              <button
+                onClick={()=> setLibraryMode(libraryMode==="personal" ? "shared" : "personal")}
+                className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-black text-slate-700"
+                title="個人/共有を切替"
+              >
+                {libraryMode==="personal" ? "個人庫" : "共有庫"}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={()=> newCodeItem("basic")} className="px-3 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black">新規（コード）</button>
+              <button onClick={newUrlItem} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-black text-slate-700">新規（URL）</button>
+            </div>
+
+            <div ref={dzRef} className="p-3 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="text-sm font-black text-slate-800">HTMLファイル登録</div>
+                <label className="px-3 py-2 rounded-2xl bg-white border border-slate-200 hover:bg-slate-50 text-sm font-black text-slate-700 cursor-pointer">
+                  ファイル選択
+                  <input type="file" accept=".html,.htm,text/html" className="hidden" onChange={(e)=> handleUpload(e.target.files?.[0])}/>
+                </label>
+              </div>
+              <div className="text-xs text-slate-500 mt-2">ここへ<b>.html</b>をドラッグ&ドロップ</div>
+            </div>
+
+            <input
+              className="w-full p-3 rounded-2xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-indigo-200"
+              placeholder="検索（タイトル/URL/タグ/コード/メモ/ファイル名）"
+              value={searchQuery}
+              onChange={(e)=> setSearchQuery(e.target.value)}
+            />
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                className="flex-1 p-3 rounded-2xl border border-slate-200 bg-white outline-none"
+                value={activeFolderId}
+                onChange={(e)=> setActiveFolderId(e.target.value)}
+              >
+                {foldersWithAll.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+
+              <button
+                onClick={()=> setShowTrash(!showTrash)}
+                className={`px-3 py-3 rounded-2xl border text-xs font-black ${showTrash ? "bg-rose-50 border-rose-200 text-rose-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+                title="ゴミ箱切替"
+              >ゴミ箱</button>
+
+              {!showTrash && (
+                <button
+                  onClick={()=> setStarOnly(!starOnly)}
+                  className={`px-3 py-3 rounded-2xl border text-xs font-black ${starOnly ? "bg-amber-50 border-amber-200 text-amber-900" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+                  title="スターだけ"
+                >★</button>
+              )}
+            </div>
+
+            {!showTrash && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    className="flex-1 p-3 rounded-2xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-indigo-200"
+                    placeholder="タグ絞り込み（完全一致）"
+                    value={tagFilter}
+                    onChange={(e)=> setTagFilter(e.target.value)}
+                  />
+                  <button onClick={()=> setTagFilter("")} className="px-3 py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50" title="解除">×</button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {tagSuggestions.slice(0, 14).map(tag => (
+                    <button
+                      key={tag}
+                      onClick={()=> setTagFilter(tag)}
+                      className="px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-xs font-black text-slate-700"
+                    >#{tag}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="max-h-[54vh] overflow-y-auto no-scrollbar">
+            {filteredList.length===0 && <div className="p-4 text-sm text-slate-500">表示するデータがありません。</div>}
+
+            {filteredList.map(it => (
+              <div
+                key={it.id}
+                onClick={()=> openItem(it)}
+                className={`p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer ${selected?.id===it.id ? "bg-indigo-50" : ""}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-black text-slate-800 truncate">
+                      {it.kind==="url" ? "🔗 " : "🧩 "}
+                      {it.title || (it.kind==="url" ? "URLメモ" : "無題HTML")}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      {it.kind==="url"
+                        ? (it.url || "（URL未設定）")
+                        : ((it.fileName ? `file: ${it.fileName} / ` : "") + ((it.code||"").slice(0,120) || "（HTML未入力）"))
+                      }
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-2 flex items-center gap-2 flex-wrap">
+                      <span>{(it.updatedAt||it.createdAt||"").slice(0,10)}</span>
+                      {(it.tags||[]).slice(0,3).map(t => <span key={t} className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">#{t}</span>)}
+                    </div>
+                  </div>
+
+                  {!showTrash ? (
+                    <div className="flex items-center gap-1">
+                      <button onClick={(e)=>{e.stopPropagation(); toggleStar(it.id);}} className="p-2 rounded-xl hover:bg-white" title="スター">
+                        <span className={it.starred ? "text-amber-500" : "text-slate-400"}>★</span>
+                      </button>
+                      <button onClick={(e)=>{e.stopPropagation(); moveToTrash(it.id);}} className="p-2 rounded-xl hover:bg-rose-50" title="ゴミ箱へ">🗑️</button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <button onClick={(e)=>{e.stopPropagation(); restoreFromTrash(it.id);}} className="p-2 rounded-xl hover:bg-emerald-50" title="復元">↩︎</button>
+                      <button onClick={(e)=>{e.stopPropagation(); purgeFromTrash(it.id);}} className="p-2 rounded-xl hover:bg-rose-50" title="完全削除">✖</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+
+      const RightPanel = (
+        <div className="bg-white border border-slate-200 rounded-[24px] shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+            <div className="min-w-0">
+              <div className="font-black text-slate-800 truncate">作成 / 編集 / プレビュー</div>
+              <div className="text-xs font-bold text-slate-500">Ctrl/Cmd+S 保存 / Ctrl/Cmd+P プレビュー全画面</div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={()=> setTemplatesOpen(true)} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-black text-slate-700">テンプレ</button>
+              <button onClick={()=> setJsonOpen(true)} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-black text-slate-700">JSON</button>
+              <button onClick={()=> setFoldersOpen(true)} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-black text-slate-700">フォルダ</button>
+              <button onClick={()=> setSettingsOpen(true)} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-black text-slate-700">設定</button>
+
+              <div className="w-px h-8 bg-slate-200 mx-1 hidden md:block"></div>
+
+              <button onClick={()=> { if(selected) refreshPreview(); }} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-black text-slate-700">更新</button>
+              <button onClick={()=> { if(selected) saveSelected(); }} className="px-3 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black">保存</button>
+            </div>
+          </div>
+
+          {!selected ? (
+            <div className="p-6 text-slate-500 space-y-3">
+              <div>左から項目を選ぶか、「新規（コード）/ 新規（URL）/ HTMLファイル登録」で作成してください。</div>
+            </div>
+          ) : (
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <div className="text-xs font-black text-slate-400 uppercase tracking-widest">タイトル</div>
+                  <input
+                    className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-200"
+                    value={selected.title || ""}
+                    onChange={(e)=> setSelected(prev=> ({...prev, title: e.target.value}))}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-xs font-black text-slate-400 uppercase tracking-widest">フォルダ</div>
+                  <select
+                    className="w-full p-3 rounded-2xl border border-slate-200 bg-white outline-none"
+                    value={selected.folderId || ""}
+                    onChange={(e)=> setSelected(prev=> ({...prev, folderId: e.target.value}))}
+                    disabled={showTrash}
+                  >
+                    <option value="">（フォルダなし）</option>
+                    {folders.map(f=> <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest">タグ（カンマ区切り）</div>
+                <input
+                  className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-200"
+                  value={tagsInput}
+                  onChange={(e)=> setTagsInput(e.target.value)}
+                />
+              </div>
+
+              <div className="work-h border border-slate-200 rounded-3xl overflow-hidden">
+                <div className="split" style={(window.innerWidth >= 1024) ? ({gridTemplateColumns: `${col1} 10px ${col3}`}) : ({gridTemplateRows: `${splitPct}% 10px ${100-splitPct}%`})}>
+                  <div className="h-full">
+                    <div className="h-14 px-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                      <div className="font-black text-slate-800">✍️ コード</div>
+                      <div className="flex items-center gap-2">
+                        {selected.kind==="code" && (
+                          <>
+                            <button onClick={onFormat} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-black text-slate-700">整形</button>
+                            <button onClick={()=> setFsPreviewOpen(true)} className="px-3 py-2 rounded-2xl bg-slate-900 hover:bg-black text-white text-sm font-black">全画面</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="h-[calc(100%-56px)] p-3 overflow-auto no-scrollbar">
+                      {selected.kind==="url" ? (
+                        <div className="space-y-2">
+                          <div className="text-xs font-black text-slate-400 uppercase tracking-widest">URL</div>
+                          <input
+                            className="w-full p-3 rounded-2xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-indigo-200"
+                            placeholder="https://..."
+                            value={selected.url || ""}
+                            onChange={(e)=>{
+                              const url = e.target.value;
+                              setSelected(prev => {
+                                const next = {...prev, url};
+                                if(!next.title || next.title==="URLメモ") next.title = pickTitleFromUrl(url);
+                                return next;
+                              });
+                            }}
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={async ()=>{
+                                const ok = await tryCopy(selected.url||"");
+                                toast(ok ? "URLをコピーしました" : "コピー失敗");
+                              }}
+                              className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-black text-slate-700"
+                            >コピー</button>
+                            <button
+                              onClick={()=> window.open((selected.url||""), "_blank", "noopener,noreferrer")}
+                              className="px-3 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black"
+                            >開く</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Editor
+                          value={selected.code || ""}
+                          onChange={(v)=> setSelected(prev=> ({...prev, code: v}))}
+                          theme={settings.editorTheme}
+                          onSave={saveSelected}
+                          onFormat={onFormat}
+                          onTemplate={()=> setTemplatesOpen(true)}
+                          heightPx={editorHeight}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="gutter" onMouseDown={startDrag} onTouchStart={startDrag} title="ドラッグで調整"></div>
+
+                  <div className="h-full">
+                    <div className="h-14 px-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+                      <div className="font-black text-slate-800">🖥️ プレビュー</div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={()=> refreshPreview()} className="px-3 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-black text-slate-700">更新</button>
+                        <button onClick={()=> setFsPreviewOpen(true)} className="px-3 py-2 rounded-2xl bg-slate-900 hover:bg-black text-white text-sm font-black">全画面</button>
+                      </div>
+                    </div>
+
+                    <div className="h-[calc(100%-56px)] p-3">
+                      <div className="border border-slate-200 rounded-3xl overflow-hidden bg-white" style={{height: previewHeight}}>
+                        <iframe
+                          ref={previewRef}
+                          title="preview"
+                          className="w-full h-full"
+                          sandbox={settings.safetySandbox ? "allow-scripts allow-forms allow-popups allow-modals allow-downloads" : undefined}
+                          src="about:blank"
+                        ></iframe>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="text-xs text-slate-400">
+                  更新: {(selected.updatedAt||selected.createdAt||"").slice(0,19).replace("T"," ")}
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button onClick={exportSelectedAsHtml} className="px-3 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black">HTML書き出し</button>
+                  <button
+                    onClick={()=>{
+                      const exists = items.some(x=>x.id===selected.id);
+                      if(!confirm(exists ? "この項目をゴミ箱へ移動しますか？" : "未保存のため破棄しますか？")) return;
+                      if(!exists){
+                        setSelected(null);
+                        toast("未保存を破棄しました");
+                      }else{
+                        moveToTrash(selected.id);
+                      }
+                    }}
+                    className="px-3 py-2 rounded-2xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-sm font-black text-rose-700"
+                  >ゴミ箱</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+
+      const Modal = ({open, onClose, title, children, footer, wide=false}) => {
+        if(!open) return null;
+        return (
+          <div className="fixed inset-0 z-[150]">
+            <div className="absolute inset-0 bg-black/30" onClick={onClose}></div>
+            <div className="absolute inset-x-0 top-6 mx-auto px-4" style={{maxWidth: wide ? "1100px":"860px"}}>
+              <div className="bg-white rounded-[26px] shadow-2xl border border-slate-100 overflow-hidden">
+                <div className="p-5 flex items-center justify-between gap-2">
+                  <div className="font-black text-slate-800 truncate">{title}</div>
+                  <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100" title="閉じる">✕</button>
+                </div>
+                <div className="px-5 pb-5 space-y-4">
+                  {children}
+                  {footer ? <div className="pt-1">{footer}</div> : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const TemplatesModal = (
+        <Modal
+          open={templatesOpen}
+          onClose={()=> setTemplatesOpen(false)}
+          title="テンプレ"
+          wide
+          footer={<div className="flex justify-end"><button onClick={()=> setTemplatesOpen(false)} className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold">閉じる</button></div>}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {TEMPLATES.map(t => (
+              <button key={t.id} onClick={()=> applyTemplate(t.id)} className="text-left bg-white border border-slate-200 rounded-3xl p-4 hover:bg-slate-50">
+                <div className="font-black text-slate-800">{t.name}</div>
+                <div className="text-xs text-slate-500 mt-1">ID: {t.id}</div>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      );
+
+      const JsonModal = (
+        <Modal
+          open={jsonOpen}
+          onClose={()=> setJsonOpen(false)}
+          title="JSON入出力"
+          wide
+          footer={<div className="flex justify-end"><button onClick={()=> setJsonOpen(false)} className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold">閉じる</button></div>}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="bg-white border border-slate-200 rounded-3xl p-4 space-y-2">
+              <div className="font-black text-slate-800">書き出し</div>
+              <button onClick={exportAll} className="w-full px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold">全体（ALL）</button>
+              <button onClick={exportLibrary} className="w-full px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700">今の庫（{libraryMode==="personal"?"個人":"共有"}）</button>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-3xl p-4 space-y-2">
+              <div className="font-black text-slate-800">読み込み（置換）</div>
+              <label className="w-full px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700 cursor-pointer flex items-center justify-center gap-2">
+                全体JSON
+                <input type="file" accept="application/json" className="hidden" onChange={(e)=> importAll(e.target.files?.[0])}/>
+              </label>
+              <label className="w-full px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700 cursor-pointer flex items-center justify-center gap-2">
+                庫JSON（今の庫を置換）
+                <input type="file" accept="application/json" className="hidden" onChange={(e)=> importLibraryOnly(e.target.files?.[0])}/>
+              </label>
+            </div>
+          </div>
+        </Modal>
+      );
+
+      const FoldersModal = (
+        <Modal
+          open={foldersOpen}
+          onClose={()=> setFoldersOpen(false)}
+          title="フォルダ管理"
+          wide
+          footer={
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <button onClick={createFolder} className="px-4 py-2 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-sm font-bold text-slate-700">新規フォルダ</button>
+              <button onClick={()=> setFoldersOpen(false)} className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold">閉じる</button>
+            </div>
+          }
+        >
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar pr-1">
+            {folders.length===0 && <div className="text-sm text-slate-500">フォルダはまだありません。</div>}
+            {folders.map(f => (
+              <div key={f.id} className="bg-white border border-slate-200 rounded-3xl p-4 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-black text-slate-800 truncate">{f.name}</div>
+                  <div className="text-xs text-slate-500">{(f.createdAt||"").slice(0,10)}</div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={()=> renameFolder(f.id)} className="p-2 rounded-xl hover:bg-slate-100" title="名前変更">✎</button>
+                  <button onClick={()=> deleteFolder(f.id)} className="p-2 rounded-xl hover:bg-rose-50" title="削除">🗑️</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      );
+
+      const SettingsModal = (
+        <Modal
+          open={settingsOpen}
+          onClose={()=> setSettingsOpen(false)}
+          title="設定"
+          wide
+          footer={<div className="flex justify-end"><button onClick={()=> setSettingsOpen(false)} className="px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold">閉じる</button></div>}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4 space-y-2">
+              <div className="font-black text-slate-800">プレビュー</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-bold text-slate-700">自動更新</div>
+                <button
+                  onClick={()=> setState(prev=>({...prev, settings:{...(prev.settings||{}), previewAuto: !prev.settings.previewAuto}}))}
+                  className={`px-3 py-2 rounded-xl text-xs font-black border ${settings.previewAuto ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+                >{settings.previewAuto ? "ON" : "OFF"}</button>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-bold text-slate-700">ライブプレビュー</div>
+                <button
+                  onClick={()=> setState(prev=>({...prev, settings:{...(prev.settings||{}), livePreview: !prev.settings.livePreview}}))}
+                  className={`px-3 py-2 rounded-xl text-xs font-black border ${settings.livePreview ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+                >{settings.livePreview ? "ON" : "OFF"}</button>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-3xl p-4 space-y-2">
+              <div className="font-black text-slate-800">安全</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-bold text-slate-700">iframe sandbox</div>
+                <button
+                  onClick={()=> setState(prev=>({...prev, settings:{...(prev.settings||{}), safetySandbox: !prev.settings.safetySandbox}}))}
+                  className={`px-3 py-2 rounded-xl text-xs font-black border ${settings.safetySandbox ? "bg-emerald-50 border-emerald-200 text-emerald-800" : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+                >{settings.safetySandbox ? "ON" : "OFF"}</button>
+              </div>
+            </div>
+          </div>
+        </Modal>
+      );
+
+      function Fullscreen({open, title, onClose, children, onOpenNewTab}){
+        if(!open) return null;
+        return (
+          <div className="fs-overlay">
+            <div className="fs-top">
+              <div className="text-white font-black truncate">{title}</div>
+              <div className="flex items-center gap-2">
+                {onOpenNewTab && <button onClick={onOpenNewTab} className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-sm font-bold">新規タブ</button>}
+                <button onClick={onClose} className="px-3 py-2 rounded-xl bg-white text-slate-900 text-sm font-black">閉じる（Esc）</button>
+              </div>
+            </div>
+            <div className="fs-body">{children}</div>
+          </div>
+        );
+      }
+
+      useEffect(()=>{
+        const onKey = (e)=>{ if(e.key==="Escape") setFsPreviewOpen(false); };
+        if(fsPreviewOpen) window.addEventListener("keydown", onKey);
+        return ()=> window.removeEventListener("keydown", onKey);
+      }, [fsPreviewOpen]);
+
+      const onOpenPreviewNewTab = () => {
+        if(!selected) return;
+        if(selected.kind==="url"){
+          if(!selected.url) return toast("URL未入力");
+          window.open(selected.url, "_blank", "noopener,noreferrer");
+        }else{
+          const blob = new Blob([selected.code || ""], {type:"text/html;charset=utf-8"});
+          const u = URL.createObjectURL(blob);
+          window.open(u, "_blank", "noopener,noreferrer");
+          setTimeout(()=>URL.revokeObjectURL(u), 60_000);
+        }
+      };
+
+      const FullscreenPreview = (
+        <Fullscreen
+          open={fsPreviewOpen}
+          title={(selected?.title || "プレビュー") + "（全画面）"}
+          onClose={()=> setFsPreviewOpen(false)}
+          onOpenNewTab={onOpenPreviewNewTab}
+        >
+          <iframe
+            title="fullscreen-preview"
+            className="w-full h-full"
+            sandbox={settings.safetySandbox ? "allow-scripts allow-forms allow-popups allow-modals allow-downloads" : undefined}
+            src={selected?.kind==="url" ? (selected?.url || "about:blank") : "about:blank"}
+            srcDoc={selected?.kind==="code" ? (selected?.code || "") : undefined}
+          />
+        </Fullscreen>
+      );
+
+      return (
+        <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="min-w-0">
+              <div className="text-2xl font-black text-slate-900 truncate">HTML Vault PRO v4</div>
+              <div className="text-xs font-bold text-slate-500">目的：保存 / 検索 / 作成（HTMLファイル・コード・URL）</div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={()=> { if(selected) setFsPreviewOpen(true); }} className="px-3 py-2 rounded-2xl bg-slate-900 hover:bg-black text-white text-sm font-black">
+                プレビュー全画面
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {LeftPanel}
+            {RightPanel}
+          </div>
+
+          {TemplatesModal}
+          {JsonModal}
+          {FoldersModal}
+          {SettingsModal}
+          {FullscreenPreview}
+
+          {toastObj && (
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[220] no-print">
+              <div className="bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl text-sm font-black">
+                {toastObj.msg}
+              </div>
+            </div>
+          )}
+
+          <div className="text-[11px] text-slate-400 text-center pt-2 no-print">
+            ©2026 Takayuki WAYAMA（LocalStorage / No Cloud）｜分割リサイズ・全画面プレビュー対応
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    try{ window.lucide?.createIcons?.(); }catch{}
+  </script>
+</body>
+</html>
